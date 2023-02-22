@@ -1,0 +1,8 @@
+Origin: ppa.pika-os.com
+Label: apt repository
+Codename: kinetic
+Architectures: amd64 
+Components: main
+Description: pika-os kernel repo
+SignWith: 752E173A3F8B04F5
+Pull: kinetic
