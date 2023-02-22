@@ -12,4 +12,4 @@ reprepro -V --basedir ./output/repo/ includedeb kinetic ./output/linux-headers*.
 
 gpg --armor --export harderthanfire@gmail.com | tee ./output/repo/key.gpg
 
-rsync -azP --delete ./output/repo/ pikappa@pika-os.com:/srv/www/pikappa/
+rsync -azP --delete ./output/repo/ ferreo@pika-os.com:/srv/www/pikappa/
