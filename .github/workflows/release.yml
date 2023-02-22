@@ -1,0 +1,25 @@
+name: PikaOS Kernel Build And Release
+
+on:
+  workflow_dispatch
+
+jobs:
+  build:
+    runs-on: self-hosted
+    container:
+      image: ubuntu:latest
+      volumes:
+        - /proc:/proc
+      options: --privileged -it
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install needed packages
+      run: apt update && apt install bc bison build-essential ccache cpio fakeroot flex git kmod libelf-dev libncurses5-dev libssl-dev lz4 qtbase5-dev rsync schedtool wget zstd tar -y
+
+    - name: Build Kernel
+      run: ./main.sh
+
+    - name: Release Kernel
+      run: ./scripts/release.sh
