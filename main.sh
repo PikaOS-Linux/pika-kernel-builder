@@ -1,9 +1,9 @@
 #!/bin/bash
 
-bash ./scripts/source.sh
-bash ./scripts/patch.sh
-bash ./scripts/config.sh
-bash ./scripts/build.sh
-bash ./scripts/output.sh
+. ./scripts/source.sh
+. ./scripts/patch.sh
+. ./scripts/config.sh
+. ./scripts/build.sh
+. ./scripts/output.sh
 
 
