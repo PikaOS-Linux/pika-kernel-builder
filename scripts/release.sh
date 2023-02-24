@@ -13,8 +13,7 @@ rsync -azP --exclude '*.deb' ferreo@pika-os.com:/srv/www/pikappa/ ./output/repo
 cp ./output/key.gpg ./output/repo/key.gpg
 
 # Remove our existing package from the repo
-reprepro -V --basedir ./output/repo/ remove kinetic linux-image*
-reprepro -V --basedir ./output/repo/ remove kinetic linux-headers*
+reprepro -V --basedir ./output/repo/ removefilter kinetic 'Package (% linux-*-pikaos*)'
 
 # Add the new package to the repo
 reprepro -V --basedir ./output/repo/ includedeb kinetic ./output/linux-image*.deb
