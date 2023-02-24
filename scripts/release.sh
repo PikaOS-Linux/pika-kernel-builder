@@ -7,7 +7,7 @@ dpkg-sig --sign builder ./output/linux-image*.deb
 dpkg-sig --sign builder ./output/linux-headers*.deb
 
 # Pull down existing ppa repo db files etc
-rsync -azP --exclude '*.deb' ferreo@pika-os.com:/srv/www/pikappa/ ./output/repo
+rsync -azP --exclude '*.deb' ferreo@direct.pika-os.com:/srv/www/pikappa/ ./output/repo
 
 # Copy over our gpg key in case it has been updated
 cp ./output/key.gpg ./output/repo/key.gpg
@@ -20,4 +20,4 @@ reprepro -V --basedir ./output/repo/ includedeb kinetic ./output/linux-image*.de
 reprepro -V --basedir ./output/repo/ includedeb kinetic ./output/linux-headers*.deb
 
 # Push the updated ppa repo to the server
-rsync -azP ./output/repo/ ferreo@pika-os.com:/srv/www/pikappa/
+rsync -azP ./output/repo/ ferreo@direct.pika-os.com:/srv/www/pikappa/
