@@ -2,6 +2,9 @@
 
 echo "Pika Kernel - Applying patches"
 
+# WE want linux-tools so patch em in
+patch -Np1 < "../patches/0000-linux-tools.patch"
+
 # Cachy patches are here: https://github.com/CachyOS/kernel-patches/
 # orig patch from cachy - 0001-cachyos-base-all.patch
 patch -Np1 < "../patches/0001-cachy-all.patch"
