@@ -42,6 +42,8 @@ scripts/config -d ZRAM_DEF_COMP_LZORLE \
 
 scripts/config --set-val MODULE_COMPRESS_ZSTD_LEVEL 19 -e MODULE_COMPRESS_ZSTD_ULTRA --set-val MODULE_COMPRESS_ZSTD_LEVEL_ULTRA 22 --set-val ZSTD_COMP_VAL 22
 
+scripts/config -e EFI_HANDOVER_PROTOCOL
+
 scripts/config -e USER_NS
 
 scripts/config -d DEBUG_INFO \
