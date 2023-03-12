@@ -7,10 +7,12 @@ echo "Pika Kernel - Applying patches"
 patch -Np1 < "../patches/0001-cachy-all.patch"
 # orig patch from cachy - 0001-Add-latency-priority-for-CFS-class.patch
 patch -Np1 < "../patches/0002-cfs-nice.patch"
-# orig patch from cachy - 0001-bore-cachy.patch
-patch -Np1 < "../patches/0003-bore.patch"
+# orig patch from cachy
+patch -Np1 < "../patches/0003-eevdf.patch"
+# orig patch from cachy - 0001-bore-eevdf.patch
+patch -Np1 < "../patches/0004-bore.patch"
 # HDR patch - from cachy (but they deleted it)
-patch -Np1 < "../patches/0004-hdr.patch"
+patch -Np1 < "../patches/0005-hdr.patch"
 # Nobara patches are here: https://github.com/sammilucia/nobara-kernel-fork
 # Extra Leigon laptop goodies
 patch -Np1 < "../patches/0001-Add-legion-laptop-v0.1.patch"
