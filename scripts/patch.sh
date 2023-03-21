@@ -11,9 +11,11 @@ patch -Np1 < "../patches/0002-eevdf.patch"
 patch -Np1 < "../patches/0003-bore.patch"
 # HDR patch - from cachy (but they deleted it)
 patch -Np1 < "../patches/0004-hdr.patch"
+# AMD GPU USB C fix patch
+patch -Np1 < "../patches/0005-amd-usbc-fix.patch"
 # Nobara patches are here: https://github.com/sammilucia/nobara-kernel-fork
 # Extra Leigon laptop goodies
-#patch -Np1 < "../patches/0001-Add-legion-laptop-v0.1.patch"
+patch -Np1 < "../patches/0001-Add-legion-laptop-v0.1.patch"
 # Allow setting custom pollrates for usb devices
 patch -Np1 < "../patches/0001-Allow-to-set-custom-USB-pollrate-for-specific-device.patch"
 # Allow pre polaris cards to use the amdgpu kernel module
