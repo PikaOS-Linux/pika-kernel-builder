@@ -2,7 +2,6 @@
 
 echo "Pika Kernel - Getting source"
 
-wget -nv https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.2.6.tar.gz
-tar -zxf ./linux-6.2.6.tar.gz
+git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/ -b linux-6.2.y linux-6.2.y
 
-cd linux-6.2.6
+cd linux-6.2.y
