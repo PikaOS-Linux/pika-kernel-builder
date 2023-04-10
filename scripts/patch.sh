@@ -13,6 +13,10 @@ patch -Np1 < "../patches/0003-bore.patch"
 patch -Np1 < "../patches/0004-hdr.patch"
 # AMD GPU USB C fix patch
 patch -Np1 < "../patches/0005-amd-usbc-fix.patch"
+# Nintendo controller rumble patch
+patch -Np1 < "../patches/0006-Nintendo-controller-one.patch"
+# Nintendo controller BT patch
+patch -Np1 < "../patches/0006-Nintendo-controller-two.patch"
 # Nobara patches are here: https://github.com/sammilucia/nobara-kernel-fork
 # Extra Leigon laptop goodies
 patch -Np1 < "../patches/0001-Add-legion-laptop-v0.1.patch"
