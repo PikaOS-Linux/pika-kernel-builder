@@ -5,5 +5,3 @@
 . ../scripts/config.sh
 . ../scripts/build.sh
 . ../scripts/output.sh
-
-

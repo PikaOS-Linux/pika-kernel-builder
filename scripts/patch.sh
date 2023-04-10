@@ -7,12 +7,10 @@ echo "Pika Kernel - Applying patches"
 patch -Np1 < "../patches/0001-cachy-all.patch"
 # orig patch from cachy
 patch -Np1 < "../patches/0002-eevdf.patch"
-# orig patch from cachy - 0001-bore-eevdf.patch
-patch -Np1 < "../patches/0003-bore.patch"
-# HDR patch - from cachy (but they deleted it)
-patch -Np1 < "../patches/0004-hdr.patch"
-# AMD GPU USB C fix patch
-patch -Np1 < "../patches/0005-amd-usbc-fix.patch"
+# orig patch from cachy - 0001-bore-eevdf.patch - looks to not exist for 6.3 so switch to eevdf/cfs
+#patch -Np1 < "../patches/0003-bore.patch"
+# HDR patch - Currently broken against 6.3
+#patch -Np1 < "../patches/0004-hdr.patch"
 # Nintendo controller rumble patch
 patch -Np1 < "../patches/0006-Nintendo-controller-one.patch"
 # Nintendo controller BT patch
@@ -24,7 +22,3 @@ patch -Np1 < "../patches/0001-Add-legion-laptop-v0.1.patch"
 patch -Np1 < "../patches/0001-Allow-to-set-custom-USB-pollrate-for-specific-device.patch"
 # Allow pre polaris cards to use the amdgpu kernel module
 patch -Np1 < "../patches/amdgpu-si-cik-default.patch"
-# Disable mt76 buggy aspm
-#patch -Np1 < "../patches/mt76_-mt7921_-Disable-powersave-features-by-default.patch"
-# Make PS4 controllers have 1000hz pollrate over bluetooth like the actual console
-patch -Np1 < "../patches/set-ps4-bt-poll-rate-1000hz.patch"

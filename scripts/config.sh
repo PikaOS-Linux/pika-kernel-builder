@@ -6,7 +6,7 @@ cp ../config .config
 
 scripts/config -k -e CONFIG_GENERIC_CPU
 scripts/config -e CACHY
-scripts/config -e SCHED_BORE
+scripts/config -e SCHED_CFS
 
 scripts/config -e HZ_300 --set-val HZ 1000
 scripts/config -d HZ_PERIODIC -d NO_HZ_FULL -e NO_HZ_IDLE  -e NO_HZ -e NO_HZ_COMMON
