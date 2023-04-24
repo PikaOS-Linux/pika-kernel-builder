@@ -12,7 +12,7 @@ rsync -azP --exclude '*.deb' ferreo@direct.pika-os.com:/srv/www/pikappa/ ./outpu
 echo "Pika Kernel - Repo rsync pull complete"
 
 # Remove our existing package from the repo - only for current version so we can update it
-reprepro -V --basedir ./output/repo/ removefilter kinetic 'Package (% linux-*-6.3.0-pikaos*)'
+reprepro -V --basedir ./output/repo/ removefilter lunar 'Package (% linux-*-6.3.0-pikaos*)'
 echo "Pika Kernel - Repo clean complete"
 
 # Add the new package to the repo
