@@ -14,12 +14,11 @@ rsync -azP --exclude '*.deb' ferreo@direct.pika-os.com:/srv/www/pikappa/ ./outpu
 cp ./output/key.gpg ./output/repo/key.gpg
 
 # Remove our existing package from the repo - only for current version so we can update it
-reprepro -V --basedir ./output/repo/ removefilter kinetic 'Package (% linux-6.3.0-*-pikaos*)'
+reprepro -V --basedir ./output/repo/ removefilter lunar 'Package (% linux-6.3.0-*-pikaos*)'
 
 # Add the new package to the repo
-reprepro -V --basedir ./output/repo/ includedeb kinetic ./output/linux-image*.deb
-reprepro -V --basedir ./output/repo/ includedeb kinetic ./output/linux-headers*.deb
-#reprepro -V --basedir ./output/repo/ includedeb kinetic ./output/linux-tools*.deb
+reprepro -V --basedir ./output/repo/ includedeb lunar ./output/linux-image*.deb
+reprepro -V --basedir ./output/repo/ includedeb lunar ./output/linux-headers*.deb
 
 # Push the updated ppa repo to the server
 rsync -azP ./output/repo/ ferreo@direct.pika-os.com:/srv/www/pikappa/
