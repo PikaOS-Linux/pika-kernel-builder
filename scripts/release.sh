@@ -14,7 +14,7 @@ rsync -azP --exclude '*.deb' ferreo@direct.pika-os.com:/srv/www/pikappa/ ./outpu
 cp ./output/key.gpg ./output/repo/key.gpg
 
 # Remove our existing package from the repo - only for current version so we can update it
-reprepro -V --basedir ./output/repo/ removefilter lunar 'Package (% linux-6.3.0*pikaos*)'
+reprepro -V --basedir ./output/repo/ removefilter lunar 'Package (% linux-*-6.3.0-pikaos*)'
 
 # Add the new package to the repo
 reprepro -V --basedir ./output/repo/ includedeb lunar ./output/linux-image*.deb
