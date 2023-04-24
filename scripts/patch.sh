@@ -7,8 +7,6 @@ echo "Pika Kernel - Applying patches"
 patch -Np1 < "../patches/0001-cachy-all.patch"
 # orig patch from cachy
 patch -Np1 < "../patches/0002-eevdf.patch"
-# Linux-surface
-patch -Np1 < "../patches/surface/*.patch"
 # HDR patch - Currently broken against 6.3
 #patch -Np1 < "../patches/0004-hdr.patch"
 # Nintendo controller rumble patch
