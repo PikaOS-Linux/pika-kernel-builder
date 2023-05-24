@@ -16,8 +16,7 @@ reprepro -V --basedir ./output/repo/ removefilter lunar 'Package (% linux-*-6.3.
 echo "Pika Kernel - Repo clean complete"
 
 # Add the new package to the repo
-reprepro -V --basedir ./output/repo/ includedeb lunar ./output/linux-image*.deb
-reprepro -V --basedir ./output/repo/ includedeb lunar ./output/linux-headers*.deb
+reprepro -V --basedir ./output/repo/ includedeb lunar ./output/*.deb
 echo "Pika Kernel - Repo update complete"
 
 # Push the updated ppa repo to the server
