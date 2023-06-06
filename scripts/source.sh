@@ -2,7 +2,7 @@
 
 echo "Pika Kernel - Getting source"
 
-wget -nv https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.3.tar.xz
-tar -xf ./linux-6.3.tar.xz
+wget -nv https://git.kernel.org/torvalds/t/linux-6.4-rc5.tar.gz
+tar -xf ./linux-6.4-rc5.tar.gz
 
-cd linux-6.3
+cd linux-6.4-rc5
