@@ -1,7 +1,7 @@
-From 32c617afc05751783be3eb0f5a1d15e31dfc7919 Mon Sep 17 00:00:00 2001
+From 36f784097e0e29a60cec92421f8b45884ac83000 Mon Sep 17 00:00:00 2001
 From: Piotr Gorski <lucjan.lucjanov@gmail.com>
-Date: Thu, 8 Jun 2023 11:14:23 +0200
-Subject: [PATCH] bore-cachy
+Date: Thu, 8 Jun 2023 11:16:15 +0200
+Subject: [PATCH] bore
 
 Signed-off-by: Piotr Gorski <lucjan.lucjanov@gmail.com>
 ---
@@ -42,10 +42,10 @@ index eed5d65b8..38fbebe4d 100644
  	/*
  	 * 'ptraced' is the list of tasks this task is using ptrace() on.
 diff --git a/init/Kconfig b/init/Kconfig
-index 0147b4a33..4ab7e154b 100644
+index 32c24950c..6cde71f5c 100644
 --- a/init/Kconfig
 +++ b/init/Kconfig
-@@ -1290,6 +1290,26 @@ config CHECKPOINT_RESTORE
+@@ -1257,6 +1257,26 @@ config CHECKPOINT_RESTORE
  
  	  If unsure, say N here.
  
@@ -73,10 +73,10 @@ index 0147b4a33..4ab7e154b 100644
  	bool "Automatic process group scheduling"
  	select CGROUPS
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index bcb3a7e68..a0f227344 100644
+index a68d1276b..9f585cc61 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -4484,6 +4484,57 @@ int wake_up_state(struct task_struct *p, unsigned int state)
+@@ -4447,6 +4447,57 @@ int wake_up_state(struct task_struct *p, unsigned int state)
  	return try_to_wake_up(p, state, 0);
  }
  
@@ -134,7 +134,7 @@ index bcb3a7e68..a0f227344 100644
  /*
   * Perform scheduler related setup for a newly forked process p.
   * p is forked by current.
-@@ -4500,6 +4551,9 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
+@@ -4463,6 +4514,9 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
  	p->se.prev_sum_exec_runtime	= 0;
  	p->se.nr_migrations		= 0;
  	p->se.vruntime			= 0;
@@ -144,7 +144,7 @@ index bcb3a7e68..a0f227344 100644
  	INIT_LIST_HEAD(&p->se.group_node);
  
  #ifdef CONFIG_FAIR_GROUP_SCHED
-@@ -4726,6 +4780,9 @@ late_initcall(sched_core_sysctl_init);
+@@ -4689,6 +4743,9 @@ late_initcall(sched_core_sysctl_init);
  int sched_fork(unsigned long clone_flags, struct task_struct *p)
  {
  	__sched_fork(clone_flags, p);
@@ -154,7 +154,7 @@ index bcb3a7e68..a0f227344 100644
  	/*
  	 * We mark the process as NEW here. This guarantees that
  	 * nobody will actually run it, and a signal or other external
-@@ -9922,6 +9979,11 @@ void __init sched_init(void)
+@@ -9885,6 +9942,11 @@ void __init sched_init(void)
  	BUG_ON(&dl_sched_class != &stop_sched_class + 1);
  #endif
  
@@ -167,7 +167,7 @@ index bcb3a7e68..a0f227344 100644
  
  #ifdef CONFIG_FAIR_GROUP_SCHED
 diff --git a/kernel/sched/debug.c b/kernel/sched/debug.c
-index 066ff1c8a..4bc07d405 100644
+index 0b2340a79..46e2f7639 100644
 --- a/kernel/sched/debug.c
 +++ b/kernel/sched/debug.c
 @@ -593,6 +593,9 @@ print_task(struct seq_file *m, struct rq *rq, struct task_struct *p)
@@ -181,7 +181,7 @@ index 066ff1c8a..4bc07d405 100644
  	SEQ_printf(m, " %d %d", task_node(p), task_numa_group_id(p));
  #endif
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 9fe8288b1..ac29ac350 100644
+index 373ff5f55..3c6c033ca 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
 @@ -19,6 +19,9 @@
@@ -194,7 +194,7 @@ index 9fe8288b1..ac29ac350 100644
   */
  #include <linux/energy_model.h>
  #include <linux/mmap_lock.h>
-@@ -140,6 +143,61 @@ static unsigned int normalized_sysctl_sched_wakeup_granularity	= 1000000UL;
+@@ -126,6 +129,61 @@ static unsigned int normalized_sysctl_sched_wakeup_granularity	= 1000000UL;
  
  const_debug unsigned int sysctl_sched_migration_cost	= 500000UL;
  
@@ -256,7 +256,7 @@ index 9fe8288b1..ac29ac350 100644
  int sched_thermal_decay_shift;
  static int __init setup_sched_thermal_decay_shift(char *str)
  {
-@@ -203,6 +261,51 @@ static unsigned int sysctl_numa_balancing_promote_rate_limit = 65536;
+@@ -185,6 +243,51 @@ static unsigned int sysctl_numa_balancing_promote_rate_limit = 65536;
  
  #ifdef CONFIG_SYSCTL
  static struct ctl_table sched_fair_sysctls[] = {
@@ -308,7 +308,7 @@ index 9fe8288b1..ac29ac350 100644
  	{
  		.procname       = "sched_child_runs_first",
  		.data           = &sysctl_sched_child_runs_first,
-@@ -724,11 +827,19 @@ int sched_update_scaling(void)
+@@ -706,11 +809,19 @@ int sched_update_scaling(void)
  /*
   * delta /= w
   */
@@ -328,7 +328,7 @@ index 9fe8288b1..ac29ac350 100644
  	return delta;
  }
  
-@@ -938,6 +1049,14 @@ static void update_curr(struct cfs_rq *cfs_rq)
+@@ -920,6 +1031,14 @@ static void update_curr(struct cfs_rq *cfs_rq)
  	curr->sum_exec_runtime += delta_exec;
  	schedstat_add(cfs_rq->exec_clock, delta_exec);
  
@@ -343,7 +343,7 @@ index 9fe8288b1..ac29ac350 100644
  	curr->vruntime += calc_delta_fair(delta_exec, curr);
  	update_min_vruntime(cfs_rq);
  
-@@ -6410,6 +6529,9 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
+@@ -6392,6 +6511,9 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
  	util_est_dequeue(&rq->cfs, p);
  
  	for_each_sched_entity(se) {
@@ -353,7 +353,7 @@ index 9fe8288b1..ac29ac350 100644
  		cfs_rq = cfs_rq_of(se);
  		dequeue_entity(cfs_rq, se, flags);
  
-@@ -7844,7 +7966,11 @@ static unsigned long wakeup_gran(struct sched_entity *se)
+@@ -7789,7 +7911,11 @@ static unsigned long wakeup_gran(struct sched_entity *se)
  	 * This is especially important for buddies when the leftmost
  	 * task is higher priority than the buddy.
  	 */
@@ -365,7 +365,7 @@ index 9fe8288b1..ac29ac350 100644
  }
  
  /*
-@@ -7865,6 +7991,13 @@ static int
+@@ -7810,6 +7936,13 @@ static int
  wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
  {
  	s64 gran, vdiff = curr->vruntime - se->vruntime;
@@ -379,7 +379,7 @@ index 9fe8288b1..ac29ac350 100644
  
  	if (vdiff <= 0)
  		return -1;
-@@ -8210,6 +8343,9 @@ static void yield_task_fair(struct rq *rq)
+@@ -8155,6 +8288,9 @@ static void yield_task_fair(struct rq *rq)
  	struct task_struct *curr = rq->curr;
  	struct cfs_rq *cfs_rq = task_cfs_rq(curr);
  	struct sched_entity *se = &curr->se;
@@ -390,7 +390,7 @@ index 9fe8288b1..ac29ac350 100644
  	/*
  	 * Are we the only task in the tree?
 diff --git a/kernel/sched/features.h b/kernel/sched/features.h
-index 9e390eb82..696ea7081 100644
+index ee7f23c76..3115bde98 100644
 --- a/kernel/sched/features.h
 +++ b/kernel/sched/features.h
 @@ -4,7 +4,11 @@
