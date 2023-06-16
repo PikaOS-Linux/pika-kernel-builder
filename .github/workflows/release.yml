@@ -7,17 +7,14 @@ jobs:
   build:
     runs-on: self-hosted
     container:
-      image: ubuntu:lunar
+      image: ghcr.io/pikaos-linux/pika-kernel-container:latest
       volumes:
         - /proc:/proc
       options: --privileged -it
 
     steps:
     - uses: actions/checkout@v3
-  
-    - name: Install needed packages
-      run: apt update && apt install bc gpg gpg-agent bison build-essential ccache cpio fakeroot flex git kmod libelf-dev debhelper libncurses5-dev libssl-dev lz4 qtbase5-dev rsync schedtool wget zstd tar dpkg-sig -y
-
+    
     - name: Import GPG key
       id: import_gpg
       uses: crazy-max/ghaction-import-gpg@v5
