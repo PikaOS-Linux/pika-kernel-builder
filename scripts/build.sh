@@ -2,4 +2,4 @@
 
 echo "Pika Kernel - Building"
 
-make -j`nproc` bindeb-pkg LOCALVERSION=-pikaos KDEB_PKGVERSION=$(make kernelversion)-1
+make -j`nproc` bindeb-pkg LOCALVERSION=-pikaos KDEB_PKGVERSION=$(make kernelversion)-2
