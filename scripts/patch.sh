@@ -16,3 +16,5 @@ patch -Np1 < "../patches/0002-eevdfbore.patch"
 patch -Np1 < "../patches/0004-Allow-to-set-custom-USB-pollrate-for-specific-device.patch"
 # Allow pre polaris cards to use the amdgpu kernel module
 patch -Np1 < "../patches/0005-amdgpu-si-cik-default.patch"
+# AMD Patch for CPPC
+patch -Np1 < "../patches/0006-AMD-cppc.patch"
