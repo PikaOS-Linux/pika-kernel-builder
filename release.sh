@@ -8,7 +8,7 @@ wget -nv https://launchpad.net/ubuntu/+archive/primary/+files/reprepro_5.3.0-1.4
 apt install -y ./reprepro_5.3.0-1.4_amd64.deb
 
 # Add the new package to the repo
-reprepro -V --basedir ./output/repo/ includedeb lunar ./output/*.deb
+reprepro -V -C main --basedir ./output/repo/ includedeb lunar ./output/*.deb
 
 # Push the updated ppa repo to the server
 rsync -azqP ./output/repo/ ferreo@direct.pika-os.com:/srv/www/pikappa/
