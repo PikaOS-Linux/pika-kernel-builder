@@ -7,5 +7,5 @@ rm ./linux-libc*.deb
 
 for f in *.deb; 
 do
-    cp $f ./output/lunar_$f
+    cp $f ./output/mantic_$f
 done
