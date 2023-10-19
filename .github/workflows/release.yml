@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: self-hosted
     container:
-      image: ghcr.io/pikaos-linux/pika-kernel-container:f48d8d6ea24049351f74133da4232634c3bcb2ffe66e0ff7e6f2692fdd33d25d
+      image: ghcr.io/pikaos-linux/pika-kernel-container@sha256:f48d8d6ea24049351f74133da4232634c3bcb2ffe66e0ff7e6f2692fdd33d25d
       volumes:
         - /proc:/proc
       options: --privileged -it
