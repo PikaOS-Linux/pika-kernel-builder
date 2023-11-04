@@ -1,4 +1,5 @@
 cachyos/0001-cachyos-base-all.patch
+cachyos/0001-bore-cachy.patch
 nobara/0001-Allow-to-set-custom-USB-pollrate-for-specific-device.patch
 nobara/set-ps4-bt-poll-rate-1000hz.patch
 nobara-rebased/amdgpu-si-cik-default.patch
