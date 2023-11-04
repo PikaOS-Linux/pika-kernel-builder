@@ -18,7 +18,7 @@ index dbd26fde4..c9b8b80af 100644
 @@ -6552,6 +6552,14 @@
  					delay after resetting its port);
  			Example: quirks=0781:5580:bk,0a5c:5834:gij
-
+ 
 +	usbcore.interrupt_interval_override=
 +			[USB] A list of USB devices for which a different polling
 +			interval than the default shall be used on all interrupt-type
@@ -29,15 +29,15 @@ index dbd26fde4..c9b8b80af 100644
 +
  	usbhid.mousepoll=
  			[USBHID] The interval which mice are to be polled at.
-
+ 
 diff --git a/drivers/usb/core/config.c b/drivers/usb/core/config.c
 index 48bc8a481..84bd550ad 100644
 --- a/drivers/usb/core/config.c
 +++ b/drivers/usb/core/config.c
 @@ -19,6 +19,149 @@
  #define USB_MAXCONFIG			8	/* Arbitrary limit */
-
-
+ 
+ 
 +/* A struct associated with the interrupt_interval_override module parameter, representing
 +   an user's choice to force a specific interrupt interval upon all interrupt endpoints of
 +   a certain device. */
@@ -191,12 +191,12 @@ index 48bc8a481..84bd550ad 100644
 -	unsigned int maxp;
 +	unsigned int maxp, ival;
  	const unsigned short *maxpacket_maxes;
-
+ 
  	d = (struct usb_endpoint_descriptor *) buffer;
 @@ -386,6 +529,23 @@ static int usb_parse_endpoint(struct device *ddev, int cfgno,
  		endpoint->desc.bInterval = n;
  	}
-
+ 
 +	/* Override the interrupt polling interval if a module parameter tells us to do so. */
 +	if (usb_endpoint_xfer_int(d)) {
 +		ival = usb_check_interrupt_interval_override(udev);
@@ -235,7 +235,7 @@ index 11b15d7b3..ec52c6322 100644
 +++ b/drivers/usb/core/usb.c
 @@ -1066,6 +1066,7 @@ static void __exit usb_exit(void)
  		return;
-
+ 
  	usb_release_quirk_list();
 +	usb_release_interrupt_interval_override_list();
  	usb_deregister_device_driver(&usb_generic_driver);
@@ -253,5 +253,6 @@ index 82538daac..b6faa897c 100644
  extern bool usb_endpoint_is_ignored(struct usb_device *udev,
  		struct usb_host_interface *intf,
  		struct usb_endpoint_descriptor *epd);
---
+-- 
 2.39.0
+

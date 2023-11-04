@@ -1,0 +1,1007 @@
+From: Cristian Ciocaltea @ 2023-09-07 17:10 UTC (permalink / raw)
+  To: James Schulman, David Rhodes, Richard Fitzgerald,
+	Jaroslav Kysela, Takashi Iwai, Liam Girdwood, Mark Brown,
+	Stefan Binding, Charles Keepax, Vitaly Rodionov
+  Cc: alsa-devel, patches, linux-kernel, kernel
+
+The return code of regmap_multi_reg_write() call related to "MDSYNC
+down" sequence is shadowed by the subsequent
+wait_for_completion_timeout() invocation, which is expected to time
+timeout in case the write operation failed.
+
+Let cs35l41_global_enable() return the correct error code instead of
+-ETIMEDOUT.
+
+Fixes: f5030564938b ("ALSA: cs35l41: Add shared boost feature")
+Signed-off-by: Cristian Ciocaltea <cristian.ciocaltea@collabora.com>
+Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
+---
+ sound/soc/codecs/cs35l41-lib.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/codecs/cs35l41-lib.c b/sound/soc/codecs/cs35l41-lib.c
+index 4ec306cd2f47..a018f1d98428 100644
+--- a/sound/soc/codecs/cs35l41-lib.c
++++ b/sound/soc/codecs/cs35l41-lib.c
+@@ -1243,7 +1243,7 @@ int cs35l41_global_enable(struct device *dev, struct regmap *regmap, enum cs35l4
+ 		cs35l41_mdsync_down_seq[2].def = pwr_ctrl1;
+ 		ret = regmap_multi_reg_write(regmap, cs35l41_mdsync_down_seq,
+ 					     ARRAY_SIZE(cs35l41_mdsync_down_seq));
+-		if (!enable)
++		if (ret || !enable)
+ 			break;
+ 
+ 		if (!pll_lock)
+-- 
+2.41.0
+From: Cristian Ciocaltea @ 2023-09-07 17:10 UTC (permalink / raw)
+  To: James Schulman, David Rhodes, Richard Fitzgerald,
+	Jaroslav Kysela, Takashi Iwai, Liam Girdwood, Mark Brown,
+	Stefan Binding, Charles Keepax, Vitaly Rodionov
+  Cc: alsa-devel, patches, linux-kernel, kernel
+
+The return code of regmap_multi_reg_write() call related to "MDSYNC up"
+sequence is shadowed by the subsequent regmap_read_poll_timeout()
+invocation, which will hit a timeout in case the write operation above
+fails.
+
+Make sure cs35l41_global_enable() returns the correct error code instead
+of -ETIMEDOUT.
+
+Additionally, to be able to distinguish between the timeouts of
+wait_for_completion_timeout() and regmap_read_poll_timeout(), print an
+error message for the former and return immediately.  This also avoids
+having to wait unnecessarily for the second time.
+
+Fixes: f8264c759208 ("ALSA: cs35l41: Poll for Power Up/Down rather than waiting a fixed delay")
+Signed-off-by: Cristian Ciocaltea <cristian.ciocaltea@collabora.com>
+Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
+---
+ sound/soc/codecs/cs35l41-lib.c | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/sound/soc/codecs/cs35l41-lib.c b/sound/soc/codecs/cs35l41-lib.c
+index a018f1d98428..a6c6bb23b957 100644
+--- a/sound/soc/codecs/cs35l41-lib.c
++++ b/sound/soc/codecs/cs35l41-lib.c
+@@ -1251,15 +1251,18 @@ int cs35l41_global_enable(struct device *dev, struct regmap *regmap, enum cs35l4
+ 
+ 		ret = wait_for_completion_timeout(pll_lock, msecs_to_jiffies(1000));
+ 		if (ret == 0) {
+-			ret = -ETIMEDOUT;
+-		} else {
+-			regmap_read(regmap, CS35L41_PWR_CTRL3, &pwr_ctrl3);
+-			pwr_ctrl3 |= CS35L41_SYNC_EN_MASK;
+-			cs35l41_mdsync_up_seq[0].def = pwr_ctrl3;
+-			ret = regmap_multi_reg_write(regmap, cs35l41_mdsync_up_seq,
+-						     ARRAY_SIZE(cs35l41_mdsync_up_seq));
++			dev_err(dev, "Timed out waiting for pll_lock\n");
++			return -ETIMEDOUT;
+ 		}
+ 
++		regmap_read(regmap, CS35L41_PWR_CTRL3, &pwr_ctrl3);
++		pwr_ctrl3 |= CS35L41_SYNC_EN_MASK;
++		cs35l41_mdsync_up_seq[0].def = pwr_ctrl3;
++		ret = regmap_multi_reg_write(regmap, cs35l41_mdsync_up_seq,
++					     ARRAY_SIZE(cs35l41_mdsync_up_seq));
++		if (ret)
++			return ret;
++
+ 		ret = regmap_read_poll_timeout(regmap, CS35L41_IRQ1_STATUS1,
+ 					int_status, int_status & pup_pdn_mask,
+ 					1000, 100000);
+-- 
+2.41.0
+From: Cristian Ciocaltea @ 2023-09-07 17:10 UTC (permalink / raw)
+  To: James Schulman, David Rhodes, Richard Fitzgerald,
+	Jaroslav Kysela, Takashi Iwai, Liam Girdwood, Mark Brown,
+	Stefan Binding, Charles Keepax, Vitaly Rodionov
+  Cc: alsa-devel, patches, linux-kernel, kernel
+
+Technically, an interrupt handler can be called before probe() finishes
+its execution, hence ensure the pll_lock completion object is always
+initialized before being accessed in cs35l41_irq().
+
+Fixes: f5030564938b ("ALSA: cs35l41: Add shared boost feature")
+Signed-off-by: Cristian Ciocaltea <cristian.ciocaltea@collabora.com>
+Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
+---
+ sound/soc/codecs/cs35l41.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/codecs/cs35l41.c b/sound/soc/codecs/cs35l41.c
+index 722b69a6de26..fe5376b3e01b 100644
+--- a/sound/soc/codecs/cs35l41.c
++++ b/sound/soc/codecs/cs35l41.c
+@@ -1273,6 +1273,8 @@ int cs35l41_probe(struct cs35l41_private *cs35l41, const struct cs35l41_hw_cfg *
+ 		regmap_update_bits(cs35l41->regmap, CS35L41_IRQ1_MASK3, CS35L41_INT3_PLL_LOCK_MASK,
+ 				   0 << CS35L41_INT3_PLL_LOCK_SHIFT);
+ 
++	init_completion(&cs35l41->pll_lock);
++
+ 	ret = devm_request_threaded_irq(cs35l41->dev, cs35l41->irq, NULL, cs35l41_irq,
+ 					IRQF_ONESHOT | IRQF_SHARED | irq_pol,
+ 					"cs35l41", cs35l41);
+@@ -1295,8 +1297,6 @@ int cs35l41_probe(struct cs35l41_private *cs35l41, const struct cs35l41_hw_cfg *
+ 	if (ret < 0)
+ 		goto err;
+ 
+-	init_completion(&cs35l41->pll_lock);
+-
+ 	pm_runtime_set_autosuspend_delay(cs35l41->dev, 3000);
+ 	pm_runtime_use_autosuspend(cs35l41->dev);
+ 	pm_runtime_mark_last_busy(cs35l41->dev);
+-- 
+2.41.0
+From: Cristian Ciocaltea @ 2023-09-07 17:10 UTC (permalink / raw)
+  To: James Schulman, David Rhodes, Richard Fitzgerald,
+	Jaroslav Kysela, Takashi Iwai, Liam Girdwood, Mark Brown,
+	Stefan Binding, Charles Keepax, Vitaly Rodionov
+  Cc: alsa-devel, patches, linux-kernel, kernel
+
+Enabling the active/passive shared boosts requires setting SYNC_EN, but
+*not* before receiving the PLL Lock signal.
+
+Due to improper error handling, it was not obvious that waiting for the
+completion operation times out and, consequently, the shared boost is
+never activated.
+
+Further investigations revealed the signal is triggered while
+snd_pcm_start() is executed, right after receiving the
+SNDRV_PCM_TRIGGER_START command, which happens long after the
+SND_SOC_DAPM_PRE_PMU event handler is invoked as part of
+snd_pcm_prepare().  That is where cs35l41_global_enable() is called
+from.
+
+Increasing the wait duration doesn't help, as it only causes an
+unnecessary delay in the invocation of snd_pcm_start().  Moving the wait
+and the subsequent regmap operations to the SNDRV_PCM_TRIGGER_START
+callback is not a solution either, since they would be executed in an
+IRQ-off atomic context.
+
+Solve the issue by setting the SYNC_EN bit in PWR_CTRL3 register right
+after receiving the PLL Lock interrupt.
+
+Additionally, drop the unnecessary writes to PWR_CTRL1 register, part of
+the original mdsync_up_seq, which would have toggled GLOBAL_EN with
+unwanted consequences on PLL locking behavior.
+
+Fixes: f5030564938b ("ALSA: cs35l41: Add shared boost feature")
+Signed-off-by: Cristian Ciocaltea <cristian.ciocaltea@collabora.com>
+---
+ include/sound/cs35l41.h        |  4 +--
+ sound/pci/hda/cs35l41_hda.c    |  4 +--
+ sound/soc/codecs/cs35l41-lib.c | 61 ++++++++++++++++++++--------------
+ sound/soc/codecs/cs35l41.c     | 24 ++++++++-----
+ sound/soc/codecs/cs35l41.h     |  1 -
+ 5 files changed, 55 insertions(+), 39 deletions(-)
+
+diff --git a/include/sound/cs35l41.h b/include/sound/cs35l41.h
+index 1bf757901d02..2fe8c6b0d4cf 100644
+--- a/include/sound/cs35l41.h
++++ b/include/sound/cs35l41.h
+@@ -11,7 +11,6 @@
+ #define __CS35L41_H
+ 
+ #include <linux/regmap.h>
+-#include <linux/completion.h>
+ #include <linux/firmware/cirrus/cs_dsp.h>
+ 
+ #define CS35L41_FIRSTREG		0x00000000
+@@ -902,7 +901,8 @@ int cs35l41_exit_hibernate(struct device *dev, struct regmap *regmap);
+ int cs35l41_init_boost(struct device *dev, struct regmap *regmap,
+ 		       struct cs35l41_hw_cfg *hw_cfg);
+ bool cs35l41_safe_reset(struct regmap *regmap, enum cs35l41_boost_type b_type);
++int cs35l41_mdsync_up(struct regmap *regmap);
+ int cs35l41_global_enable(struct device *dev, struct regmap *regmap, enum cs35l41_boost_type b_type,
+-			  int enable, struct completion *pll_lock, bool firmware_running);
++			  int enable, bool firmware_running);
+ 
+ #endif /* __CS35L41_H */
+diff --git a/sound/pci/hda/cs35l41_hda.c b/sound/pci/hda/cs35l41_hda.c
+index f9b77353c266..09a9c135d9b6 100644
+--- a/sound/pci/hda/cs35l41_hda.c
++++ b/sound/pci/hda/cs35l41_hda.c
+@@ -527,7 +527,7 @@ static void cs35l41_hda_play_done(struct device *dev)
+ 
+ 	dev_dbg(dev, "Play (Complete)\n");
+ 
+-	cs35l41_global_enable(dev, reg, cs35l41->hw_cfg.bst_type, 1, NULL,
++	cs35l41_global_enable(dev, reg, cs35l41->hw_cfg.bst_type, 1,
+ 			      cs35l41->firmware_running);
+ 	if (cs35l41->firmware_running) {
+ 		regmap_multi_reg_write(reg, cs35l41_hda_unmute_dsp,
+@@ -546,7 +546,7 @@ static void cs35l41_hda_pause_start(struct device *dev)
+ 	dev_dbg(dev, "Pause (Start)\n");
+ 
+ 	regmap_multi_reg_write(reg, cs35l41_hda_mute, ARRAY_SIZE(cs35l41_hda_mute));
+-	cs35l41_global_enable(dev, reg, cs35l41->hw_cfg.bst_type, 0, NULL,
++	cs35l41_global_enable(dev, reg, cs35l41->hw_cfg.bst_type, 0,
+ 			      cs35l41->firmware_running);
+ }
+ 
+diff --git a/sound/soc/codecs/cs35l41-lib.c b/sound/soc/codecs/cs35l41-lib.c
+index a6c6bb23b957..2ec5fdc875b1 100644
+--- a/sound/soc/codecs/cs35l41-lib.c
++++ b/sound/soc/codecs/cs35l41-lib.c
+@@ -1192,8 +1192,28 @@ bool cs35l41_safe_reset(struct regmap *regmap, enum cs35l41_boost_type b_type)
+ }
+ EXPORT_SYMBOL_GPL(cs35l41_safe_reset);
+ 
++/*
++ * Enabling the CS35L41_SHD_BOOST_ACTV and CS35L41_SHD_BOOST_PASS shared boosts
++ * does also require a call to cs35l41_mdsync_up(), but not before getting the
++ * PLL Lock signal.
++ *
++ * PLL Lock seems to be triggered soon after snd_pcm_start() is executed and
++ * SNDRV_PCM_TRIGGER_START command is processed, which happens (long) after the
++ * SND_SOC_DAPM_PRE_PMU event handler is invoked as part of snd_pcm_prepare().
++ *
++ * This event handler is where cs35l41_global_enable() is normally called from,
++ * but waiting for PLL Lock here will time out. Increasing the wait duration
++ * will not help, as the only consequence of it would be to add an unnecessary
++ * delay in the invocation of snd_pcm_start().
++ *
++ * Trying to move the wait in the SNDRV_PCM_TRIGGER_START callback is not a
++ * solution either, as the trigger is executed in an IRQ-off atomic context.
++ *
++ * The current approach is to invoke cs35l41_mdsync_up() right after receiving
++ * the PLL Lock interrupt, in the IRQ handler.
++ */
+ int cs35l41_global_enable(struct device *dev, struct regmap *regmap, enum cs35l41_boost_type b_type,
+-			  int enable, struct completion *pll_lock, bool firmware_running)
++			  int enable, bool firmware_running)
+ {
+ 	int ret;
+ 	unsigned int gpio1_func, pad_control, pwr_ctrl1, pwr_ctrl3, int_status, pup_pdn_mask;
+@@ -1203,11 +1223,6 @@ int cs35l41_global_enable(struct device *dev, struct regmap *regmap, enum cs35l4
+ 		{CS35L41_GPIO_PAD_CONTROL,	0},
+ 		{CS35L41_PWR_CTRL1,		0, 3000},
+ 	};
+-	struct reg_sequence cs35l41_mdsync_up_seq[] = {
+-		{CS35L41_PWR_CTRL3,	0},
+-		{CS35L41_PWR_CTRL1,	0x00000000, 3000},
+-		{CS35L41_PWR_CTRL1,	0x00000001, 3000},
+-	};
+ 
+ 	pup_pdn_mask = enable ? CS35L41_PUP_DONE_MASK : CS35L41_PDN_DONE_MASK;
+ 
+@@ -1241,26 +1256,11 @@ int cs35l41_global_enable(struct device *dev, struct regmap *regmap, enum cs35l4
+ 		cs35l41_mdsync_down_seq[0].def = pwr_ctrl3;
+ 		cs35l41_mdsync_down_seq[1].def = pad_control;
+ 		cs35l41_mdsync_down_seq[2].def = pwr_ctrl1;
++
+ 		ret = regmap_multi_reg_write(regmap, cs35l41_mdsync_down_seq,
+ 					     ARRAY_SIZE(cs35l41_mdsync_down_seq));
+-		if (ret || !enable)
+-			break;
+-
+-		if (!pll_lock)
+-			return -EINVAL;
+-
+-		ret = wait_for_completion_timeout(pll_lock, msecs_to_jiffies(1000));
+-		if (ret == 0) {
+-			dev_err(dev, "Timed out waiting for pll_lock\n");
+-			return -ETIMEDOUT;
+-		}
+-
+-		regmap_read(regmap, CS35L41_PWR_CTRL3, &pwr_ctrl3);
+-		pwr_ctrl3 |= CS35L41_SYNC_EN_MASK;
+-		cs35l41_mdsync_up_seq[0].def = pwr_ctrl3;
+-		ret = regmap_multi_reg_write(regmap, cs35l41_mdsync_up_seq,
+-					     ARRAY_SIZE(cs35l41_mdsync_up_seq));
+-		if (ret)
++		/* Activation to be completed later via cs35l41_mdsync_up() */
++		if (ret || enable)
+ 			return ret;
+ 
+ 		ret = regmap_read_poll_timeout(regmap, CS35L41_IRQ1_STATUS1,
+@@ -1269,7 +1269,7 @@ int cs35l41_global_enable(struct device *dev, struct regmap *regmap, enum cs35l4
+ 		if (ret)
+ 			dev_err(dev, "Enable(%d) failed: %d\n", enable, ret);
+ 
+-		// Clear PUP/PDN status
++		/* Clear PUP/PDN status */
+ 		regmap_write(regmap, CS35L41_IRQ1_STATUS1, pup_pdn_mask);
+ 		break;
+ 	case CS35L41_INT_BOOST:
+@@ -1351,6 +1351,17 @@ int cs35l41_global_enable(struct device *dev, struct regmap *regmap, enum cs35l4
+ }
+ EXPORT_SYMBOL_GPL(cs35l41_global_enable);
+ 
++/*
++ * To be called after receiving the IRQ Lock interrupt, in order to complete
++ * any shared boost activation initiated by cs35l41_global_enable().
++ */
++int cs35l41_mdsync_up(struct regmap *regmap)
++{
++	return regmap_update_bits(regmap, CS35L41_PWR_CTRL3,
++				  CS35L41_SYNC_EN_MASK, CS35L41_SYNC_EN_MASK);
++}
++EXPORT_SYMBOL_GPL(cs35l41_mdsync_up);
++
+ int cs35l41_gpio_config(struct regmap *regmap, struct cs35l41_hw_cfg *hw_cfg)
+ {
+ 	struct cs35l41_gpio_cfg *gpio1 = &hw_cfg->gpio1;
+diff --git a/sound/soc/codecs/cs35l41.c b/sound/soc/codecs/cs35l41.c
+index fe5376b3e01b..12327b4c3d56 100644
+--- a/sound/soc/codecs/cs35l41.c
++++ b/sound/soc/codecs/cs35l41.c
+@@ -459,7 +459,19 @@ static irqreturn_t cs35l41_irq(int irq, void *data)
+ 
+ 	if (status[2] & CS35L41_PLL_LOCK) {
+ 		regmap_write(cs35l41->regmap, CS35L41_IRQ1_STATUS3, CS35L41_PLL_LOCK);
+-		complete(&cs35l41->pll_lock);
++
++		if (cs35l41->hw_cfg.bst_type == CS35L41_SHD_BOOST_ACTV ||
++		    cs35l41->hw_cfg.bst_type == CS35L41_SHD_BOOST_PASS) {
++			ret = cs35l41_mdsync_up(cs35l41->regmap);
++			if (ret)
++				dev_err(cs35l41->dev, "MDSYNC-up failed: %d\n", ret);
++			else
++				dev_dbg(cs35l41->dev, "MDSYNC-up done\n");
++
++			dev_dbg(cs35l41->dev, "PUP-done status: %d\n",
++				!!(status[0] & CS35L41_PUP_DONE_MASK));
++		}
++
+ 		ret = IRQ_HANDLED;
+ 	}
+ 
+@@ -500,11 +512,11 @@ static int cs35l41_main_amp_event(struct snd_soc_dapm_widget *w,
+ 						ARRAY_SIZE(cs35l41_pup_patch));
+ 
+ 		ret = cs35l41_global_enable(cs35l41->dev, cs35l41->regmap, cs35l41->hw_cfg.bst_type,
+-					    1, &cs35l41->pll_lock, cs35l41->dsp.cs_dsp.running);
++					    1, cs35l41->dsp.cs_dsp.running);
+ 		break;
+ 	case SND_SOC_DAPM_POST_PMD:
+ 		ret = cs35l41_global_enable(cs35l41->dev, cs35l41->regmap, cs35l41->hw_cfg.bst_type,
+-					    0, &cs35l41->pll_lock, cs35l41->dsp.cs_dsp.running);
++					    0, cs35l41->dsp.cs_dsp.running);
+ 
+ 		regmap_multi_reg_write_bypassed(cs35l41->regmap,
+ 						cs35l41_pdn_patch,
+@@ -802,10 +814,6 @@ static const struct snd_pcm_hw_constraint_list cs35l41_constraints = {
+ static int cs35l41_pcm_startup(struct snd_pcm_substream *substream,
+ 			       struct snd_soc_dai *dai)
+ {
+-	struct cs35l41_private *cs35l41 = snd_soc_component_get_drvdata(dai->component);
+-
+-	reinit_completion(&cs35l41->pll_lock);
+-
+ 	if (substream->runtime)
+ 		return snd_pcm_hw_constraint_list(substream->runtime, 0,
+ 						  SNDRV_PCM_HW_PARAM_RATE,
+@@ -1273,8 +1281,6 @@ int cs35l41_probe(struct cs35l41_private *cs35l41, const struct cs35l41_hw_cfg *
+ 		regmap_update_bits(cs35l41->regmap, CS35L41_IRQ1_MASK3, CS35L41_INT3_PLL_LOCK_MASK,
+ 				   0 << CS35L41_INT3_PLL_LOCK_SHIFT);
+ 
+-	init_completion(&cs35l41->pll_lock);
+-
+ 	ret = devm_request_threaded_irq(cs35l41->dev, cs35l41->irq, NULL, cs35l41_irq,
+ 					IRQF_ONESHOT | IRQF_SHARED | irq_pol,
+ 					"cs35l41", cs35l41);
+diff --git a/sound/soc/codecs/cs35l41.h b/sound/soc/codecs/cs35l41.h
+index 34d967d4372b..c85cbc1dd333 100644
+--- a/sound/soc/codecs/cs35l41.h
++++ b/sound/soc/codecs/cs35l41.h
+@@ -33,7 +33,6 @@ struct cs35l41_private {
+ 	int irq;
+ 	/* GPIO for /RST */
+ 	struct gpio_desc *reset_gpio;
+-	struct completion pll_lock;
+ };
+ 
+ int cs35l41_probe(struct cs35l41_private *cs35l41, const struct cs35l41_hw_cfg *hw_cfg);
+-- 
+2.41.0
+From: Cristian Ciocaltea @ 2023-09-07 17:10 UTC (permalink / raw)
+  To: James Schulman, David Rhodes, Richard Fitzgerald,
+	Jaroslav Kysela, Takashi Iwai, Liam Girdwood, Mark Brown,
+	Stefan Binding, Charles Keepax, Vitaly Rodionov
+  Cc: alsa-devel, patches, linux-kernel, kernel
+
+The interrupt handler invokes pm_runtime_get_sync() without checking the
+returned error code.
+
+Add a proper verification and switch to pm_runtime_resume_and_get(), to
+avoid the need to call pm_runtime_put_noidle() for decrementing the PM
+usage counter before returning from the error condition.
+
+Fixes: f517ba4924ad ("ASoC: cs35l41: Add support for hibernate memory retention mode")
+Signed-off-by: Cristian Ciocaltea <cristian.ciocaltea@collabora.com>
+Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
+---
+ sound/soc/codecs/cs35l41.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/codecs/cs35l41.c b/sound/soc/codecs/cs35l41.c
+index 12327b4c3d56..a31cb9ba7f7d 100644
+--- a/sound/soc/codecs/cs35l41.c
++++ b/sound/soc/codecs/cs35l41.c
+@@ -386,10 +386,18 @@ static irqreturn_t cs35l41_irq(int irq, void *data)
+ 	struct cs35l41_private *cs35l41 = data;
+ 	unsigned int status[4] = { 0, 0, 0, 0 };
+ 	unsigned int masks[4] = { 0, 0, 0, 0 };
+-	int ret = IRQ_NONE;
+ 	unsigned int i;
++	int ret;
+ 
+-	pm_runtime_get_sync(cs35l41->dev);
++	ret = pm_runtime_resume_and_get(cs35l41->dev);
++	if (ret < 0) {
++		dev_err(cs35l41->dev,
++			"pm_runtime_resume_and_get failed in %s: %d\n",
++			__func__, ret);
++		return IRQ_NONE;
++	}
++
++	ret = IRQ_NONE;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(status); i++) {
+ 		regmap_read(cs35l41->regmap,
+-- 
+2.41.0
+From: Cristian Ciocaltea @ 2023-09-07 17:10 UTC (permalink / raw)
+  To: James Schulman, David Rhodes, Richard Fitzgerald,
+	Jaroslav Kysela, Takashi Iwai, Liam Girdwood, Mark Brown,
+	Stefan Binding, Charles Keepax, Vitaly Rodionov
+  Cc: alsa-devel, patches, linux-kernel, kernel
+
+According to the documentation, drivers are responsible for undoing at
+removal time all runtime PM changes done during probing.
+
+Hence, add the missing calls to pm_runtime_dont_use_autosuspend(), which
+are necessary for undoing pm_runtime_use_autosuspend().
+
+Note this would have been handled implicitly by
+devm_pm_runtime_enable(), but there is a need to continue using
+pm_runtime_enable()/pm_runtime_disable() in order to ensure the runtime
+PM is disabled as soon as the remove() callback is entered.
+
+Fixes: f517ba4924ad ("ASoC: cs35l41: Add support for hibernate memory retention mode")
+Signed-off-by: Cristian Ciocaltea <cristian.ciocaltea@collabora.com>
+---
+ sound/soc/codecs/cs35l41.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/sound/soc/codecs/cs35l41.c b/sound/soc/codecs/cs35l41.c
+index a31cb9ba7f7d..5456e6bfa242 100644
+--- a/sound/soc/codecs/cs35l41.c
++++ b/sound/soc/codecs/cs35l41.c
+@@ -1334,6 +1334,7 @@ int cs35l41_probe(struct cs35l41_private *cs35l41, const struct cs35l41_hw_cfg *
+ 	return 0;
+ 
+ err_pm:
++	pm_runtime_dont_use_autosuspend(cs35l41->dev);
+ 	pm_runtime_disable(cs35l41->dev);
+ 	pm_runtime_put_noidle(cs35l41->dev);
+ 
+@@ -1350,6 +1351,7 @@ EXPORT_SYMBOL_GPL(cs35l41_probe);
+ void cs35l41_remove(struct cs35l41_private *cs35l41)
+ {
+ 	pm_runtime_get_sync(cs35l41->dev);
++	pm_runtime_dont_use_autosuspend(cs35l41->dev);
+ 	pm_runtime_disable(cs35l41->dev);
+ 
+ 	regmap_write(cs35l41->regmap, CS35L41_IRQ1_MASK1, 0xFFFFFFFF);
+-- 
+2.41.0
+From: Cristian Ciocaltea @ 2023-09-07 17:10 UTC (permalink / raw)
+  To: James Schulman, David Rhodes, Richard Fitzgerald,
+	Jaroslav Kysela, Takashi Iwai, Liam Girdwood, Mark Brown,
+	Stefan Binding, Charles Keepax, Vitaly Rodionov
+  Cc: alsa-devel, patches, linux-kernel, kernel
+
+Use dev_err_probe() helper where possible, to simplify error handling
+during probe.
+
+Signed-off-by: Cristian Ciocaltea <cristian.ciocaltea@collabora.com>
+Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
+---
+ sound/soc/codecs/cs35l41-i2c.c |  9 +++------
+ sound/soc/codecs/cs35l41-spi.c |  9 +++------
+ sound/soc/codecs/cs35l41.c     | 34 ++++++++++++++++------------------
+ 3 files changed, 22 insertions(+), 30 deletions(-)
+
+diff --git a/sound/soc/codecs/cs35l41-i2c.c b/sound/soc/codecs/cs35l41-i2c.c
+index 7ea890d7d387..9109203a7f25 100644
+--- a/sound/soc/codecs/cs35l41-i2c.c
++++ b/sound/soc/codecs/cs35l41-i2c.c
+@@ -35,7 +35,6 @@ static int cs35l41_i2c_probe(struct i2c_client *client)
+ 	struct device *dev = &client->dev;
+ 	struct cs35l41_hw_cfg *hw_cfg = dev_get_platdata(dev);
+ 	const struct regmap_config *regmap_config = &cs35l41_regmap_i2c;
+-	int ret;
+ 
+ 	cs35l41 = devm_kzalloc(dev, sizeof(struct cs35l41_private), GFP_KERNEL);
+ 
+@@ -47,11 +46,9 @@ static int cs35l41_i2c_probe(struct i2c_client *client)
+ 
+ 	i2c_set_clientdata(client, cs35l41);
+ 	cs35l41->regmap = devm_regmap_init_i2c(client, regmap_config);
+-	if (IS_ERR(cs35l41->regmap)) {
+-		ret = PTR_ERR(cs35l41->regmap);
+-		dev_err(cs35l41->dev, "Failed to allocate register map: %d\n", ret);
+-		return ret;
+-	}
++	if (IS_ERR(cs35l41->regmap))
++		return dev_err_probe(cs35l41->dev, PTR_ERR(cs35l41->regmap),
++				     "Failed to allocate register map\n");
+ 
+ 	return cs35l41_probe(cs35l41, hw_cfg);
+ }
+diff --git a/sound/soc/codecs/cs35l41-spi.c b/sound/soc/codecs/cs35l41-spi.c
+index 5c8bb24909eb..28e9c9473e60 100644
+--- a/sound/soc/codecs/cs35l41-spi.c
++++ b/sound/soc/codecs/cs35l41-spi.c
+@@ -32,7 +32,6 @@ static int cs35l41_spi_probe(struct spi_device *spi)
+ 	const struct regmap_config *regmap_config = &cs35l41_regmap_spi;
+ 	struct cs35l41_hw_cfg *hw_cfg = dev_get_platdata(&spi->dev);
+ 	struct cs35l41_private *cs35l41;
+-	int ret;
+ 
+ 	cs35l41 = devm_kzalloc(&spi->dev, sizeof(struct cs35l41_private), GFP_KERNEL);
+ 	if (!cs35l41)
+@@ -43,11 +42,9 @@ static int cs35l41_spi_probe(struct spi_device *spi)
+ 
+ 	spi_set_drvdata(spi, cs35l41);
+ 	cs35l41->regmap = devm_regmap_init_spi(spi, regmap_config);
+-	if (IS_ERR(cs35l41->regmap)) {
+-		ret = PTR_ERR(cs35l41->regmap);
+-		dev_err(&spi->dev, "Failed to allocate register map: %d\n", ret);
+-		return ret;
+-	}
++	if (IS_ERR(cs35l41->regmap))
++		return dev_err_probe(cs35l41->dev, PTR_ERR(cs35l41->regmap),
++				     "Failed to allocate register map\n");
+ 
+ 	cs35l41->dev = &spi->dev;
+ 	cs35l41->irq = spi->irq;
+diff --git a/sound/soc/codecs/cs35l41.c b/sound/soc/codecs/cs35l41.c
+index 5456e6bfa242..7ddaa9bd8911 100644
+--- a/sound/soc/codecs/cs35l41.c
++++ b/sound/soc/codecs/cs35l41.c
+@@ -1190,16 +1190,14 @@ int cs35l41_probe(struct cs35l41_private *cs35l41, const struct cs35l41_hw_cfg *
+ 
+ 	ret = devm_regulator_bulk_get(cs35l41->dev, CS35L41_NUM_SUPPLIES,
+ 				      cs35l41->supplies);
+-	if (ret != 0) {
+-		dev_err(cs35l41->dev, "Failed to request core supplies: %d\n", ret);
+-		return ret;
+-	}
++	if (ret != 0)
++		return dev_err_probe(cs35l41->dev, ret,
++				     "Failed to request core supplies\n");
+ 
+ 	ret = regulator_bulk_enable(CS35L41_NUM_SUPPLIES, cs35l41->supplies);
+-	if (ret != 0) {
+-		dev_err(cs35l41->dev, "Failed to enable core supplies: %d\n", ret);
+-		return ret;
+-	}
++	if (ret != 0)
++		return dev_err_probe(cs35l41->dev, ret,
++				     "Failed to enable core supplies\n");
+ 
+ 	/* returning NULL can be an option if in stereo mode */
+ 	cs35l41->reset_gpio = devm_gpiod_get_optional(cs35l41->dev, "reset",
+@@ -1211,8 +1209,8 @@ int cs35l41_probe(struct cs35l41_private *cs35l41, const struct cs35l41_hw_cfg *
+ 			dev_info(cs35l41->dev,
+ 				 "Reset line busy, assuming shared reset\n");
+ 		} else {
+-			dev_err(cs35l41->dev,
+-				"Failed to get reset GPIO: %d\n", ret);
++			dev_err_probe(cs35l41->dev, ret,
++				      "Failed to get reset GPIO\n");
+ 			goto err;
+ 		}
+ 	}
+@@ -1228,8 +1226,8 @@ int cs35l41_probe(struct cs35l41_private *cs35l41, const struct cs35l41_hw_cfg *
+ 				       int_status, int_status & CS35L41_OTP_BOOT_DONE,
+ 				       1000, 100000);
+ 	if (ret) {
+-		dev_err(cs35l41->dev,
+-			"Failed waiting for OTP_BOOT_DONE: %d\n", ret);
++		dev_err_probe(cs35l41->dev, ret,
++			      "Failed waiting for OTP_BOOT_DONE\n");
+ 		goto err;
+ 	}
+ 
+@@ -1242,13 +1240,13 @@ int cs35l41_probe(struct cs35l41_private *cs35l41, const struct cs35l41_hw_cfg *
+ 
+ 	ret = regmap_read(cs35l41->regmap, CS35L41_DEVID, &regid);
+ 	if (ret < 0) {
+-		dev_err(cs35l41->dev, "Get Device ID failed: %d\n", ret);
++		dev_err_probe(cs35l41->dev, ret, "Get Device ID failed\n");
+ 		goto err;
+ 	}
+ 
+ 	ret = regmap_read(cs35l41->regmap, CS35L41_REVID, &reg_revid);
+ 	if (ret < 0) {
+-		dev_err(cs35l41->dev, "Get Revision ID failed: %d\n", ret);
++		dev_err_probe(cs35l41->dev, ret, "Get Revision ID failed\n");
+ 		goto err;
+ 	}
+ 
+@@ -1273,7 +1271,7 @@ int cs35l41_probe(struct cs35l41_private *cs35l41, const struct cs35l41_hw_cfg *
+ 
+ 	ret = cs35l41_otp_unpack(cs35l41->dev, cs35l41->regmap);
+ 	if (ret < 0) {
+-		dev_err(cs35l41->dev, "OTP Unpack failed: %d\n", ret);
++		dev_err_probe(cs35l41->dev, ret, "OTP Unpack failed\n");
+ 		goto err;
+ 	}
+ 
+@@ -1293,13 +1291,13 @@ int cs35l41_probe(struct cs35l41_private *cs35l41, const struct cs35l41_hw_cfg *
+ 					IRQF_ONESHOT | IRQF_SHARED | irq_pol,
+ 					"cs35l41", cs35l41);
+ 	if (ret != 0) {
+-		dev_err(cs35l41->dev, "Failed to request IRQ: %d\n", ret);
++		dev_err_probe(cs35l41->dev, ret, "Failed to request IRQ\n");
+ 		goto err;
+ 	}
+ 
+ 	ret = cs35l41_set_pdata(cs35l41);
+ 	if (ret < 0) {
+-		dev_err(cs35l41->dev, "Set pdata failed: %d\n", ret);
++		dev_err_probe(cs35l41->dev, ret, "Set pdata failed\n");
+ 		goto err;
+ 	}
+ 
+@@ -1322,7 +1320,7 @@ int cs35l41_probe(struct cs35l41_private *cs35l41, const struct cs35l41_hw_cfg *
+ 					      &soc_component_dev_cs35l41,
+ 					      cs35l41_dai, ARRAY_SIZE(cs35l41_dai));
+ 	if (ret < 0) {
+-		dev_err(cs35l41->dev, "Register codec failed: %d\n", ret);
++		dev_err_probe(cs35l41->dev, ret, "Register codec failed\n");
+ 		goto err_pm;
+ 	}
+ 
+-- 
+2.41.0
+From: Cristian Ciocaltea @ 2023-09-07 17:10 UTC (permalink / raw)
+  To: James Schulman, David Rhodes, Richard Fitzgerald,
+	Jaroslav Kysela, Takashi Iwai, Liam Girdwood, Mark Brown,
+	Stefan Binding, Charles Keepax, Vitaly Rodionov
+  Cc: alsa-devel, patches, linux-kernel, kernel
+
+Make use of the recently introduced EXPORT_GPL_DEV_PM_OPS() macro, to
+conditionally export the runtime/system PM functions.
+
+Replace the old SET_{RUNTIME,SYSTEM_SLEEP,NOIRQ_SYSTEM_SLEEP}_PM_OPS()
+helpers with their modern alternatives and get rid of the now
+unnecessary '__maybe_unused' annotations on all PM functions.
+
+Additionally, use the pm_ptr() macro to fix the following errors when
+building with CONFIG_PM disabled:
+
+ERROR: modpost: "cs35l41_pm_ops" [sound/soc/codecs/snd-soc-cs35l41-spi.ko] undefined!
+ERROR: modpost: "cs35l41_pm_ops" [sound/soc/codecs/snd-soc-cs35l41-i2c.ko] undefined!
+
+Signed-off-by: Cristian Ciocaltea <cristian.ciocaltea@collabora.com>
+Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
+---
+ sound/soc/codecs/cs35l41-i2c.c |  2 +-
+ sound/soc/codecs/cs35l41-spi.c |  2 +-
+ sound/soc/codecs/cs35l41.c     | 21 ++++++++++-----------
+ 3 files changed, 12 insertions(+), 13 deletions(-)
+
+diff --git a/sound/soc/codecs/cs35l41-i2c.c b/sound/soc/codecs/cs35l41-i2c.c
+index 9109203a7f25..96414ee35285 100644
+--- a/sound/soc/codecs/cs35l41-i2c.c
++++ b/sound/soc/codecs/cs35l41-i2c.c
+@@ -80,7 +80,7 @@ MODULE_DEVICE_TABLE(acpi, cs35l41_acpi_match);
+ static struct i2c_driver cs35l41_i2c_driver = {
+ 	.driver = {
+ 		.name		= "cs35l41",
+-		.pm		= &cs35l41_pm_ops,
++		.pm		= pm_ptr(&cs35l41_pm_ops),
+ 		.of_match_table = of_match_ptr(cs35l41_of_match),
+ 		.acpi_match_table = ACPI_PTR(cs35l41_acpi_match),
+ 	},
+diff --git a/sound/soc/codecs/cs35l41-spi.c b/sound/soc/codecs/cs35l41-spi.c
+index 28e9c9473e60..a6db44520c06 100644
+--- a/sound/soc/codecs/cs35l41-spi.c
++++ b/sound/soc/codecs/cs35l41-spi.c
+@@ -80,7 +80,7 @@ MODULE_DEVICE_TABLE(acpi, cs35l41_acpi_match);
+ static struct spi_driver cs35l41_spi_driver = {
+ 	.driver = {
+ 		.name		= "cs35l41",
+-		.pm		= &cs35l41_pm_ops,
++		.pm		= pm_ptr(&cs35l41_pm_ops),
+ 		.of_match_table = of_match_ptr(cs35l41_of_match),
+ 		.acpi_match_table = ACPI_PTR(cs35l41_acpi_match),
+ 	},
+diff --git a/sound/soc/codecs/cs35l41.c b/sound/soc/codecs/cs35l41.c
+index 7ddaa9bd8911..4bc64ba71cd6 100644
+--- a/sound/soc/codecs/cs35l41.c
++++ b/sound/soc/codecs/cs35l41.c
+@@ -1368,7 +1368,7 @@ void cs35l41_remove(struct cs35l41_private *cs35l41)
+ }
+ EXPORT_SYMBOL_GPL(cs35l41_remove);
+ 
+-static int __maybe_unused cs35l41_runtime_suspend(struct device *dev)
++static int cs35l41_runtime_suspend(struct device *dev)
+ {
+ 	struct cs35l41_private *cs35l41 = dev_get_drvdata(dev);
+ 
+@@ -1385,7 +1385,7 @@ static int __maybe_unused cs35l41_runtime_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int __maybe_unused cs35l41_runtime_resume(struct device *dev)
++static int cs35l41_runtime_resume(struct device *dev)
+ {
+ 	struct cs35l41_private *cs35l41 = dev_get_drvdata(dev);
+ 	int ret;
+@@ -1414,7 +1414,7 @@ static int __maybe_unused cs35l41_runtime_resume(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int __maybe_unused cs35l41_sys_suspend(struct device *dev)
++static int cs35l41_sys_suspend(struct device *dev)
+ {
+ 	struct cs35l41_private *cs35l41 = dev_get_drvdata(dev);
+ 
+@@ -1424,7 +1424,7 @@ static int __maybe_unused cs35l41_sys_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int __maybe_unused cs35l41_sys_suspend_noirq(struct device *dev)
++static int cs35l41_sys_suspend_noirq(struct device *dev)
+ {
+ 	struct cs35l41_private *cs35l41 = dev_get_drvdata(dev);
+ 
+@@ -1434,7 +1434,7 @@ static int __maybe_unused cs35l41_sys_suspend_noirq(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int __maybe_unused cs35l41_sys_resume_noirq(struct device *dev)
++static int cs35l41_sys_resume_noirq(struct device *dev)
+ {
+ 	struct cs35l41_private *cs35l41 = dev_get_drvdata(dev);
+ 
+@@ -1444,7 +1444,7 @@ static int __maybe_unused cs35l41_sys_resume_noirq(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int __maybe_unused cs35l41_sys_resume(struct device *dev)
++static int cs35l41_sys_resume(struct device *dev)
+ {
+ 	struct cs35l41_private *cs35l41 = dev_get_drvdata(dev);
+ 
+@@ -1454,13 +1454,12 @@ static int __maybe_unused cs35l41_sys_resume(struct device *dev)
+ 	return 0;
+ }
+ 
+-const struct dev_pm_ops cs35l41_pm_ops = {
+-	SET_RUNTIME_PM_OPS(cs35l41_runtime_suspend, cs35l41_runtime_resume, NULL)
++EXPORT_GPL_DEV_PM_OPS(cs35l41_pm_ops) = {
++	RUNTIME_PM_OPS(cs35l41_runtime_suspend, cs35l41_runtime_resume, NULL)
+ 
+-	SET_SYSTEM_SLEEP_PM_OPS(cs35l41_sys_suspend, cs35l41_sys_resume)
+-	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(cs35l41_sys_suspend_noirq, cs35l41_sys_resume_noirq)
++	SYSTEM_SLEEP_PM_OPS(cs35l41_sys_suspend, cs35l41_sys_resume)
++	NOIRQ_SYSTEM_SLEEP_PM_OPS(cs35l41_sys_suspend_noirq, cs35l41_sys_resume_noirq)
+ };
+-EXPORT_SYMBOL_GPL(cs35l41_pm_ops);
+ 
+ MODULE_DESCRIPTION("ASoC CS35L41 driver");
+ MODULE_AUTHOR("David Rhodes, Cirrus Logic Inc, <david.rhodes@cirrus.com>");
+-- 
+2.41.0
+From: Cristian Ciocaltea @ 2023-09-07 17:10 UTC (permalink / raw)
+  To: James Schulman, David Rhodes, Richard Fitzgerald,
+	Jaroslav Kysela, Takashi Iwai, Liam Girdwood, Mark Brown,
+	Stefan Binding, Charles Keepax, Vitaly Rodionov
+  Cc: alsa-devel, patches, linux-kernel, kernel
+
+If component_add() fails, probe() returns without calling
+pm_runtime_put(), which leaves the runtime PM usage counter incremented.
+
+Fix the issue by jumping to err_pm label and drop the now unnecessary
+pm_runtime_disable() call.
+
+Fixes: 7b2f3eb492da ("ALSA: hda: cs35l41: Add support for CS35L41 in HDA systems")
+Signed-off-by: Cristian Ciocaltea <cristian.ciocaltea@collabora.com>
+---
+ sound/pci/hda/cs35l41_hda.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/sound/pci/hda/cs35l41_hda.c b/sound/pci/hda/cs35l41_hda.c
+index 09a9c135d9b6..6fd827093c92 100644
+--- a/sound/pci/hda/cs35l41_hda.c
++++ b/sound/pci/hda/cs35l41_hda.c
+@@ -1625,8 +1625,7 @@ int cs35l41_hda_probe(struct device *dev, const char *device_name, int id, int i
+ 	ret = component_add(cs35l41->dev, &cs35l41_hda_comp_ops);
+ 	if (ret) {
+ 		dev_err(cs35l41->dev, "Register component failed: %d\n", ret);
+-		pm_runtime_disable(cs35l41->dev);
+-		goto err;
++		goto err_pm;
+ 	}
+ 
+ 	dev_info(cs35l41->dev, "Cirrus Logic CS35L41 (%x), Revision: %02X\n", regid, reg_revid);
+-- 
+2.41.0
+From: Cristian Ciocaltea @ 2023-09-07 17:10 UTC (permalink / raw)
+  To: James Schulman, David Rhodes, Richard Fitzgerald,
+	Jaroslav Kysela, Takashi Iwai, Liam Girdwood, Mark Brown,
+	Stefan Binding, Charles Keepax, Vitaly Rodionov
+  Cc: alsa-devel, patches, linux-kernel, kernel
+
+According to the documentation, drivers are responsible for undoing at
+removal time all runtime PM changes done during probing.
+
+Hence, add the missing calls to pm_runtime_dont_use_autosuspend(), which
+are necessary for undoing pm_runtime_use_autosuspend().
+
+Fixes: 1873ebd30cc8 ("ALSA: hda: cs35l41: Support Hibernation during Suspend")
+Signed-off-by: Cristian Ciocaltea <cristian.ciocaltea@collabora.com>
+---
+ sound/pci/hda/cs35l41_hda.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/sound/pci/hda/cs35l41_hda.c b/sound/pci/hda/cs35l41_hda.c
+index 6fd827093c92..565f7b897436 100644
+--- a/sound/pci/hda/cs35l41_hda.c
++++ b/sound/pci/hda/cs35l41_hda.c
+@@ -1633,6 +1633,7 @@ int cs35l41_hda_probe(struct device *dev, const char *device_name, int id, int i
+ 	return 0;
+ 
+ err_pm:
++	pm_runtime_dont_use_autosuspend(cs35l41->dev);
+ 	pm_runtime_disable(cs35l41->dev);
+ 	pm_runtime_put_noidle(cs35l41->dev);
+ 
+@@ -1651,6 +1652,7 @@ void cs35l41_hda_remove(struct device *dev)
+ 	struct cs35l41_hda *cs35l41 = dev_get_drvdata(dev);
+ 
+ 	pm_runtime_get_sync(cs35l41->dev);
++	pm_runtime_dont_use_autosuspend(cs35l41->dev);
+ 	pm_runtime_disable(cs35l41->dev);
+ 
+ 	if (cs35l41->halo_initialized)
+-- 
+2.41.0
+From: Cristian Ciocaltea @ 2023-09-07 17:10 UTC (permalink / raw)
+  To: James Schulman, David Rhodes, Richard Fitzgerald,
+	Jaroslav Kysela, Takashi Iwai, Liam Girdwood, Mark Brown,
+	Stefan Binding, Charles Keepax, Vitaly Rodionov
+  Cc: alsa-devel, patches, linux-kernel, kernel
+
+Replace the remaining dev_err() calls in probe() with dev_err_probe(),
+to improve consistency.
+
+Signed-off-by: Cristian Ciocaltea <cristian.ciocaltea@collabora.com>
+---
+ sound/pci/hda/cs35l41_hda.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/sound/pci/hda/cs35l41_hda.c b/sound/pci/hda/cs35l41_hda.c
+index 565f7b897436..c74faa2ff46c 100644
+--- a/sound/pci/hda/cs35l41_hda.c
++++ b/sound/pci/hda/cs35l41_hda.c
+@@ -1550,27 +1550,27 @@ int cs35l41_hda_probe(struct device *dev, const char *device_name, int id, int i
+ 	ret = regmap_read_poll_timeout(cs35l41->regmap, CS35L41_IRQ1_STATUS4, int_status,
+ 				       int_status & CS35L41_OTP_BOOT_DONE, 1000, 100000);
+ 	if (ret) {
+-		dev_err(cs35l41->dev, "Failed waiting for OTP_BOOT_DONE: %d\n", ret);
++		dev_err_probe(cs35l41->dev, ret, "Failed waiting for OTP_BOOT_DONE\n");
+ 		goto err;
+ 	}
+ 
+ 	ret = regmap_read(cs35l41->regmap, CS35L41_IRQ1_STATUS3, &int_sts);
+ 	if (ret || (int_sts & CS35L41_OTP_BOOT_ERR)) {
+-		dev_err(cs35l41->dev, "OTP Boot status %x error: %d\n",
+-			int_sts & CS35L41_OTP_BOOT_ERR, ret);
++		dev_err_probe(cs35l41->dev, ret, "OTP Boot status %x error\n",
++			      int_sts & CS35L41_OTP_BOOT_ERR);
+ 		ret = -EIO;
+ 		goto err;
+ 	}
+ 
+ 	ret = regmap_read(cs35l41->regmap, CS35L41_DEVID, &regid);
+ 	if (ret) {
+-		dev_err(cs35l41->dev, "Get Device ID failed: %d\n", ret);
++		dev_err_probe(cs35l41->dev, ret, "Get Device ID failed\n");
+ 		goto err;
+ 	}
+ 
+ 	ret = regmap_read(cs35l41->regmap, CS35L41_REVID, &reg_revid);
+ 	if (ret) {
+-		dev_err(cs35l41->dev, "Get Revision ID failed: %d\n", ret);
++		dev_err_probe(cs35l41->dev, ret, "Get Revision ID failed\n");
+ 		goto err;
+ 	}
+ 
+@@ -1593,7 +1593,7 @@ int cs35l41_hda_probe(struct device *dev, const char *device_name, int id, int i
+ 
+ 	ret = cs35l41_otp_unpack(cs35l41->dev, cs35l41->regmap);
+ 	if (ret) {
+-		dev_err(cs35l41->dev, "OTP Unpack failed: %d\n", ret);
++		dev_err_probe(cs35l41->dev, ret, "OTP Unpack failed\n");
+ 		goto err;
+ 	}
+ 
+@@ -1624,7 +1624,7 @@ int cs35l41_hda_probe(struct device *dev, const char *device_name, int id, int i
+ 
+ 	ret = component_add(cs35l41->dev, &cs35l41_hda_comp_ops);
+ 	if (ret) {
+-		dev_err(cs35l41->dev, "Register component failed: %d\n", ret);
++		dev_err_probe(cs35l41->dev, ret, "Register component failed\n");
+ 		goto err_pm;
+ 	}
+ 
+-- 
+2.41.0
+
+diff --git a/sound/pci/hda/cs35l41_hda_property.c b/sound/pci/hda/cs35l41_hda_property.c
+index b39f944..b67c636 100644
+--- a/sound/pci/hda/cs35l41_hda_property.c
++++ b/sound/pci/hda/cs35l41_hda_property.c
+@@ -6,7 +6,9 @@
+ //
+ // Author: Stefan Binding <sbinding@opensource.cirrus.com>
+ 
++#include <linux/dmi.h>
+ #include <linux/gpio/consumer.h>
++#include <linux/kernel.h>
+ #include <linux/string.h>
+ #include "cs35l41_hda_property.h"
+ 
+@@ -78,6 +80,40 @@ static int asus_rog_2023_spkr_id2(struct cs35l41_hda *cs35l41, struct device *ph
+ 	return 0;
+ }
+ 
++static int asus_rog_2023_ally_fix(struct cs35l41_hda *cs35l41, struct device *physdev, int id,
++				const char *hid)
++{
++	const char *rog_ally_bios_ver = dmi_get_system_info(DMI_BIOS_VERSION);
++	const char *rog_ally_bios_num = rog_ally_bios_ver + 6; // Dropping the RC71L. part before the number
++	int rog_ally_bios_int;
++	kstrtoint(rog_ally_bios_num, 10, &rog_ally_bios_int);
++	if(rog_ally_bios_int >= 330){
++		printk(KERN_INFO "DSD properties exist in the %d BIOS\n", rog_ally_bios_int);
++		return -ENOENT; //Patch not applicable. Exiting...
++	}
++
++	struct cs35l41_hw_cfg *hw_cfg = &cs35l41->hw_cfg;
++
++	dev_info(cs35l41->dev, "Adding DSD properties for %s\n", cs35l41->acpi_subsystem_id);
++
++	cs35l41->index = id == 0x40 ? 0 : 1;
++	cs35l41->channel_index = 0;
++	cs35l41->reset_gpio = gpiod_get_index(physdev, NULL, 0, GPIOD_OUT_HIGH);
++	cs35l41->speaker_id = cs35l41_get_speaker_id(physdev, 0, 0, 2);
++	hw_cfg->spk_pos = cs35l41->index;
++	hw_cfg->gpio1.func = CS35L41_NOT_USED;
++	hw_cfg->gpio1.valid = true;
++	hw_cfg->gpio2.func = CS35L41_INTERRUPT;
++	hw_cfg->gpio2.valid = true;
++	hw_cfg->bst_type = CS35L41_INT_BOOST;
++	hw_cfg->bst_ind = 1000; /* 1,000nH Inductance value */
++	hw_cfg->bst_ipk = 4500; /* 4,500mA peak current */
++	hw_cfg->bst_cap = 24; /* 24 microFarad cap value */
++	hw_cfg->valid = true;
++
++	return 0;
++}
++
+ struct cs35l41_prop_model {
+ 	const char *hid;
+ 	const char *ssid;
+@@ -94,7 +130,7 @@ const struct cs35l41_prop_model cs35l41_prop_model_table[] = {
+ 	{ "CSC3551", "10431483", asus_rog_2023_spkr_id2 }, // ASUS GU603V - spi, reset gpio 1
+ 	{ "CSC3551", "10431493", asus_rog_2023_spkr_id2 }, // ASUS GV601V - spi, reset gpio 1
+ 	{ "CSC3551", "10431573", asus_rog_2023_spkr_id2 }, // ASUS GZ301V - spi, reset gpio 0
+-	{ "CSC3551", "104317F3", asus_rog_2023_spkr_id2 }, // ASUS ROG ALLY - i2c
++	{ "CSC3551", "104317F3", asus_rog_2023_ally_fix }, // ASUS ROG ALLY - i2c
+ 	{ "CSC3551", "10431B93", asus_rog_2023_spkr_id2 }, // ASUS G614J - spi, reset gpio 0
+ 	{ "CSC3551", "10431CAF", asus_rog_2023_spkr_id2 }, // ASUS G634J - spi, reset gpio 0
+ 	{ "CSC3551", "10431C9F", asus_rog_2023_spkr_id2 }, // ASUS G614JI -spi, reset gpio 0
+
+-- 
+2.41.0
+

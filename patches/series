@@ -1,10 +1,23 @@
-# Cachy patches are here: https://github.com/CachyOS/kernel-patches/
-# orig patch from cachy - 0001-cachyos-base-all.patch
-0001-cachy-all.patch
-0002-eevdf.patch
-0002-eevdfbore.patch
-# Nobara patches are here: https://github.com/sammilucia/nobara-kernel-fork
-# Allow setting custom pollrates for usb devices
-0004-Allow-to-set-custom-USB-pollrate-for-specific-device.patch
-# Allow pre polaris cards to use the amdgpu kernel module
-0005-amdgpu-si-cik-default.patch
+### These patches Have some conflicts to be fixed later for now the conflicts are solved in a mega patch
+#0001-cachyos-base-all.patch
+#0002-eevdf.patch
+#0002-eevdfbore.patch
+#0001-Allow-to-set-custom-USB-pollrate-for-specific-device.patch
+#amdgpu-si-cik-default.patch
+#0001-Revert-PCI-Add-a-REBAR-size-quirk-for-Sapphire-RX-56.patch
+#0001-Revert-nvme-pci-drop-redundant-pci_enable_pcie_error.patch
+#0001-acpi-proc-idle-skip-dummy-wait.patch
+#0001-drm-i915-quirks-disable-async-flipping-on-specific-d.patch
+#0002-drm-i915-add-kernel-parameter-to-disable-async-page-.patch
+#OpenRGB.patch
+#asus-linux.patch
+#chimera-ALSA.patch
+#lenovo-legion-laptop.patch
+#linux-surface.patch
+#mt76:-mt7921:-Disable-powersave-features-by-default.patch
+#rog-ally-alsa.patch
+#rog-ally-bmc150.patch
+#rog-ally-side-keys-fix.patch
+#set-ps4-bt-poll-rate-1000hz.patch
+#steam-deck.patch
+0001-pikaos-base-all.patch
