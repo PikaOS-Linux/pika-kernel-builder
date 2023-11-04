@@ -10,7 +10,7 @@ nobara/0002-drm-i915-add-kernel-parameter-to-disable-async-page-.patch
 asuslinux/v6-0001-platform-x86-asus-wmi-add-support-for-ASUS-screen.patch
 asuslinux-rebased/v2-0002-ALSA-hda-cs35l41-Support-ASUS-2023-laptops-with-m.patch
 asuslinux/amd-tablet-sfh.patch
-nobara-rebased/linux-surface.patch
+#nobara-rebased/linux-surface.patch
 nobara/rog-ally-bmc150.patch
 nobara/rog-ally-side-keys-fix.patch
 nobara/rog-ally-alsa.patch
