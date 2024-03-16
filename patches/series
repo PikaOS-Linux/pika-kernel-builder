@@ -1,6 +1,8 @@
 cachyos/0001-cachyos-base-all.patch
 cachyos/0001-bore-cachy.patch
 cachyos/0002-ntsync.patch
+cachyos/0003-nvidia.patch
+cachyos/0004-intel.patch
 nobara/0001-Allow-to-set-custom-USB-pollrate-for-specific-device.patch
 nobara/0001-Revert-PCI-Add-a-REBAR-size-quirk-for-Sapphire-RX-56.patch
 nobara/0001-Revert-nvme-pci-drop-redundant-pci_enable_pcie_error.patch

@@ -1,0 +1,230 @@
+From d2db737a5be989688a7a5d805b7f299d0203d228 Mon Sep 17 00:00:00 2001
+From: Peter Jung <admin@ptr1337.dev>
+Date: Mon, 29 Jan 2024 15:09:44 +0100
+Subject: [PATCH] NVIDIA: Fixup GPL issue
+
+Signed-off-by: Peter Jung <admin@ptr1337.dev>
+---
+ kernel/rcu/tree_plugin.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/rcu/tree_plugin.h b/kernel/rcu/tree_plugin.h
+index 41021080ad25..72474d8ec180 100644
+--- a/kernel/rcu/tree_plugin.h
++++ b/kernel/rcu/tree_plugin.h
+@@ -406,7 +406,7 @@ void __rcu_read_lock(void)
+ 		WRITE_ONCE(current->rcu_read_unlock_special.b.need_qs, true);
+ 	barrier();  /* critical section after entry code. */
+ }
+-EXPORT_SYMBOL_GPL(__rcu_read_lock);
++EXPORT_SYMBOL(__rcu_read_lock);
+ 
+ /*
+  * Preemptible RCU implementation for rcu_read_unlock().
+@@ -431,7 +431,7 @@ void __rcu_read_unlock(void)
+ 		WARN_ON_ONCE(rrln < 0 || rrln > RCU_NEST_PMAX);
+ 	}
+ }
+-EXPORT_SYMBOL_GPL(__rcu_read_unlock);
++EXPORT_SYMBOL(__rcu_read_unlock);
+ 
+ /*
+  * Advance a ->blkd_tasks-list pointer to the next entry, instead
+-- 
+2.43.0
+
+--- a/kernel/nvidia-drm/nvidia-drm-drv.c
++++ b/kernel/nvidia-drm/nvidia-drm-drv.c
+@@ -480,6 +480,22 @@ static int nv_drm_load(struct drm_device *dev, unsigned long flags)
+         return -ENODEV;
+     }
+ 
++#if defined(NV_DRM_FBDEV_GENERIC_AVAILABLE)
++    /*
++     * If fbdev is enabled, take modeset ownership now before other DRM clients
++     * can take master (and thus NVKMS ownership).
++     */
++    if (nv_drm_fbdev_module_param) {
++        if (!nvKms->grabOwnership(pDevice)) {
++            nvKms->freeDevice(pDevice);
++            NV_DRM_DEV_LOG_ERR(nv_dev, "Failed to grab NVKMS modeset ownership");
++            return -EBUSY;
++        }
++
++        nv_dev->hasFramebufferConsole = NV_TRUE;
++    }
++#endif
++
+     mutex_lock(&nv_dev->lock);
+ 
+     /* Set NvKmsKapiDevice */
+@@ -590,6 +606,15 @@ static void __nv_drm_unload(struct drm_device *dev)
+         return;
+     }
+ 
++    /* Release modeset ownership if fbdev is enabled */
++
++#if defined(NV_DRM_FBDEV_GENERIC_AVAILABLE)
++    if (nv_dev->hasFramebufferConsole) {
++        drm_atomic_helper_shutdown(dev);
++        nvKms->releaseOwnership(nv_dev->pDevice);
++    }
++#endif
++
+     cancel_delayed_work_sync(&nv_dev->hotplug_event_work);
+     mutex_lock(&nv_dev->lock);
+ 
+@@ -1768,14 +1793,7 @@ void nv_drm_register_drm_device(const nv_gpu_info_t *gpu_info)
+     }
+ 
+ #if defined(NV_DRM_FBDEV_GENERIC_AVAILABLE)
+-    if (nv_drm_fbdev_module_param &&
+-        drm_core_check_feature(dev, DRIVER_MODESET)) {
+-
+-        if (!nvKms->grabOwnership(nv_dev->pDevice)) {
+-            NV_DRM_DEV_LOG_ERR(nv_dev, "Failed to grab NVKMS modeset ownership");
+-            goto failed_grab_ownership;
+-        }
+-
++    if (nv_dev->hasFramebufferConsole) {
+         if (bus_is_pci) {
+             struct pci_dev *pdev = to_pci_dev(device);
+ 
+@@ -1786,8 +1804,6 @@ void nv_drm_register_drm_device(const nv_gpu_info_t *gpu_info)
+ #endif
+         }
+         drm_fbdev_generic_setup(dev, 32);
+-
+-        nv_dev->hasFramebufferConsole = NV_TRUE;
+     }
+ #endif /* defined(NV_DRM_FBDEV_GENERIC_AVAILABLE) */
+ 
+@@ -1798,12 +1814,6 @@ void nv_drm_register_drm_device(const nv_gpu_info_t *gpu_info)
+ 
+     return; /* Success */
+ 
+-#if defined(NV_DRM_FBDEV_GENERIC_AVAILABLE)
+-failed_grab_ownership:
+-
+-    drm_dev_unregister(dev);
+-#endif
+-
+ failed_drm_register:
+ 
+     nv_drm_dev_free(dev);
+@@ -1870,12 +1880,6 @@ void nv_drm_remove_devices(void)
+         struct nv_drm_device *next = dev_list->next;
+         struct drm_device *dev = dev_list->dev;
+ 
+-#if defined(NV_DRM_FBDEV_GENERIC_AVAILABLE)
+-        if (dev_list->hasFramebufferConsole) {
+-            drm_atomic_helper_shutdown(dev);
+-            nvKms->releaseOwnership(dev_list->pDevice);
+-        }
+-#endif
+         drm_dev_unregister(dev);
+         nv_drm_dev_free(dev);
+
+From d82eb6c87ee2e05b6bbd35f703a41e68b3adc3a7 Mon Sep 17 00:00:00 2001
+From: Aaron Plattner <aplattner@nvidia.com>
+Date: Tue, 26 Dec 2023 11:58:46 -0800
+Subject: [PATCH] nvidia-drm: Use a workqueue to defer calling
+ drm_kms_helper_hotplug_event
+
+---
+ kernel/nvidia-drm/nvidia-drm-drv.c     | 24 ++++++++++++++++++++++++
+ kernel/nvidia-drm/nvidia-drm-encoder.c |  4 ++--
+ kernel/nvidia-drm/nvidia-drm-priv.h    |  1 +
+ 3 files changed, 27 insertions(+), 2 deletions(-)
+
+diff --git kernel/nvidia-drm/nvidia-drm-drv.c kernel/nvidia-drm/nvidia-drm-drv.c
+index e0ddb6c..9f7424d 100644
+--- kernel/nvidia-drm/nvidia-drm-drv.c
++++ kernel/nvidia-drm/nvidia-drm-drv.c
+@@ -74,6 +74,7 @@
+ #endif
+ 
+ #include <linux/pci.h>
++#include <linux/workqueue.h>
+ 
+ /*
+  * Commit fcd70cd36b9b ("drm: Split out drm_probe_helper.h")
+@@ -405,6 +406,27 @@ static int nv_drm_create_properties(struct nv_drm_device *nv_dev)
+     return 0;
+ }
+ 
++#if defined(NV_DRM_ATOMIC_MODESET_AVAILABLE)
++/*
++ * We can't just call drm_kms_helper_hotplug_event directly because
++ * fbdev_generic may attempt to set a mode from inside the hotplug event
++ * handler. Because kapi event handling runs on nvkms_kthread_q, this blocks
++ * other event processing including the flip completion notifier expected by
++ * nv_drm_atomic_commit.
++ *
++ * Defer hotplug event handling to a work item so that nvkms_kthread_q can
++ * continue processing events while a DRM modeset is in progress.
++ */
++static void nv_drm_handle_hotplug_event(struct work_struct *work)
++{
++    struct delayed_work *dwork = to_delayed_work(work);
++    struct nv_drm_device *nv_dev =
++        container_of(dwork, struct nv_drm_device, hotplug_event_work);
++
++    drm_kms_helper_hotplug_event(nv_dev->dev);
++}
++#endif
++
+ static int nv_drm_load(struct drm_device *dev, unsigned long flags)
+ {
+ #if defined(NV_DRM_ATOMIC_MODESET_AVAILABLE)
+@@ -540,6 +562,7 @@ static int nv_drm_load(struct drm_device *dev, unsigned long flags)
+ 
+     /* Enable event handling */
+ 
++    INIT_DELAYED_WORK(&nv_dev->hotplug_event_work, nv_drm_handle_hotplug_event);
+     atomic_set(&nv_dev->enable_event_handling, true);
+ 
+     init_waitqueue_head(&nv_dev->flip_event_wq);
+@@ -567,6 +590,7 @@ static void __nv_drm_unload(struct drm_device *dev)
+         return;
+     }
+ 
++    cancel_delayed_work_sync(&nv_dev->hotplug_event_work);
+     mutex_lock(&nv_dev->lock);
+ 
+     WARN_ON(nv_dev->subOwnershipGranted);
+diff --git kernel/nvidia-drm/nvidia-drm-encoder.c kernel/nvidia-drm/nvidia-drm-encoder.c
+index b5ef5a2..7c0c119 100644
+--- kernel/nvidia-drm/nvidia-drm-encoder.c
++++ kernel/nvidia-drm/nvidia-drm-encoder.c
+@@ -300,7 +300,7 @@ void nv_drm_handle_display_change(struct nv_drm_device *nv_dev,
+ 
+     nv_drm_connector_mark_connection_status_dirty(nv_encoder->nv_connector);
+ 
+-    drm_kms_helper_hotplug_event(dev);
++    schedule_delayed_work(&nv_dev->hotplug_event_work, 0);
+ }
+ 
+ void nv_drm_handle_dynamic_display_connected(struct nv_drm_device *nv_dev,
+@@ -347,6 +347,6 @@ void nv_drm_handle_dynamic_display_connected(struct nv_drm_device *nv_dev,
+     drm_reinit_primary_mode_group(dev);
+ #endif
+ 
+-    drm_kms_helper_hotplug_event(dev);
++    schedule_delayed_work(&nv_dev->hotplug_event_work, 0);
+ }
+ #endif
+diff --git kernel/nvidia-drm/nvidia-drm-priv.h kernel/nvidia-drm/nvidia-drm-priv.h
+index 253155f..c9ce727 100644
+--- kernel/nvidia-drm/nvidia-drm-priv.h
++++ kernel/nvidia-drm/nvidia-drm-priv.h
+@@ -126,6 +126,7 @@ struct nv_drm_device {
+     NvU64 modifiers[6 /* block linear */ + 1 /* linear */ + 1 /* terminator */];
+ #endif
+ 
++    struct delayed_work hotplug_event_work;
+     atomic_t enable_event_handling;
+ 
+     /**
+-- 
+2.43.0
