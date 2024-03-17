@@ -11,3 +11,8 @@ nobara/0001-acpi-proc-idle-skip-dummy-wait.patch
 nobara/0001-add-acpi_call.patch
 nobara/OpenRGB.patch
 nobara/amdgpu-si-cik-default.patch
+asuslinux/0001-platform-x86-asus-wmi-add-support-for-2024-ROG-Mini-.patch
+asuslinux/0002-platform-x86-asus-wmi-add-support-for-Vivobook-GPU-M.patch
+asuslinux/0003-platform-x86-asus-wmi-add-support-variant-of-TUF-RGB.patch
+asuslinux/0004-platform-x86-asus-wmi-support-toggling-POST-sound.patch
+asuslinux/0005-platform-x86-asus-wmi-store-a-min-default-for-ppt-op.patch
