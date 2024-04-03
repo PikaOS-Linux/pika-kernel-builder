@@ -4,11 +4,12 @@ echo "Pika Kernel - Applying configuration"
 
 cp ../config .config
 
-scripts/config -k -e CONFIG_GENERIC_CPU
+scripts/config -k -d CONFIG_GENERIC_CPU
+scripts/config -k -e CONFIG_GENERIC_CPU2
 scripts/config -e CACHY
 scripts/config -e SCHED_BORE
 
-scripts/config -e HZ_300 --set-val HZ 500
+scripts/config -e HZ_300 --set-val HZ 750
 scripts/config -d HZ_PERIODIC -d NO_HZ_IDLE -d CONTEXT_TRACKING_FORCE -e NO_HZ_FULL_NODEF -e NO_HZ_FULL -e NO_HZ -e NO_HZ_COMMON -e CONTEXT_TRACKING
 scripts/config -e PREEMPT_BUILD -d PREEMPT_NONE -d PREEMPT_VOLUNTARY -e PREEMPT -e PREEMPT_COUNT -e PREEMPTION -e PREEMPT_DYNAMIC
 
