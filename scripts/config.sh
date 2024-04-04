@@ -49,18 +49,14 @@ scripts/config -e EFI_HANDOVER_PROTOCOL
 scripts/config -e USER_NS
 
 scripts/config -d DEBUG_INFO \
-            -d DEBUG_INFO_BTF \
             -d DEBUG_INFO_DWARF4 \
             -d DEBUG_INFO_DWARF5 \
-            -d PAHOLE_HAS_SPLIT_BTF \
-            -d DEBUG_INFO_BTF_MODULES \
             -d SLUB_DEBUG \
             -d PM_DEBUG \
             -d PM_ADVANCED_DEBUG \
             -d PM_SLEEP_DEBUG \
             -d ACPI_DEBUG \
             -d SCHED_DEBUG \
-            -d LATENCYTOP \
             -d DEBUG_PREEMPT
 
 make prepare
