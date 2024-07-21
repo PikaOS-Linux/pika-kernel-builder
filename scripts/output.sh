@@ -7,5 +7,5 @@ rm ./linux-libc*.deb
 
 for f in *.deb; 
 do
-    cp $f ./output/pika4_$f
+    cp $f ./output/$f
 done
