@@ -35,12 +35,3 @@ jobs:
 
     - name: Release Kernel
       run: ./release.sh
-
-    - name: Purge cache
-      uses: strrife/cloudflare-chunked-purge-action@master
-      env:
-        # Zone is required by both authentication methods
-        CLOUDFLARE_ZONE: ${{ secrets.CLOUDFLARE_ZONE }}
-
-        CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}
-        PURGE_URLS: ${{ vars.PURGE_URLS }}
