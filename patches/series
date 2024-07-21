@@ -1,17 +1,15 @@
 cachyos/0001-cachyos-base-all.patch
 cachyos/0001-bore-cachy.patch
-cachyos/0002-ntsync.patch
-cachyos/0004-intel.patch
-nobara/0001-Allow-to-set-custom-USB-pollrate-for-specific-device.patch
-nobara/0001-Revert-PCI-Add-a-REBAR-size-quirk-for-Sapphire-RX-56.patch
-nobara/0001-Revert-nvme-pci-drop-redundant-pci_enable_pcie_error.patch
-nobara/0001-Set-amdgpu.ppfeaturemask-0xffffffff-as-default.patch
-nobara/0001-acpi-proc-idle-skip-dummy-wait.patch
-nobara/0001-add-acpi_call.patch
-nobara/amdgpu-si-cik-default.patch
-nobara/lenovo-legion-laptop.patch
-asuslinux/0001-platform-x86-asus-wmi-add-support-for-2024-ROG-Mini-.patch
-asuslinux/0002-platform-x86-asus-wmi-add-support-for-Vivobook-GPU-M.patch
-asuslinux/0003-platform-x86-asus-wmi-add-support-variant-of-TUF-RGB.patch
-asuslinux/0004-platform-x86-asus-wmi-support-toggling-POST-sound.patch
-asuslinux/0005-platform-x86-asus-wmi-store-a-min-default-for-ppt-op.patch
+# nobara/0001-Allow-to-set-custom-USB-pollrate-for-specific-device.patch
+# nobara/0001-Revert-PCI-Add-a-REBAR-size-quirk-for-Sapphire-RX-56.patch
+# nobara/0001-Revert-nvme-pci-drop-redundant-pci_enable_pcie_error.patch
+# nobara/0001-Set-amdgpu.ppfeaturemask-0xffffffff-as-default.patch
+# nobara/0001-acpi-proc-idle-skip-dummy-wait.patch
+# nobara/0001-add-acpi_call.patch
+# nobara/amdgpu-si-cik-default.patch
+# nobara/lenovo-legion-laptop.patch
+# asuslinux/0001-platform-x86-asus-wmi-add-support-for-2024-ROG-Mini-.patch
+# asuslinux/0002-platform-x86-asus-wmi-add-support-for-Vivobook-GPU-M.patch
+# asuslinux/0003-platform-x86-asus-wmi-add-support-variant-of-TUF-RGB.patch
+# asuslinux/0004-platform-x86-asus-wmi-support-toggling-POST-sound.patch
+# asuslinux/0005-platform-x86-asus-wmi-store-a-min-default-for-ppt-op.patch

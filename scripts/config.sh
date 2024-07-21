@@ -5,7 +5,7 @@ echo "Pika Kernel - Applying configuration"
 cp ../config .config
 
 scripts/config -k -d CONFIG_GENERIC_CPU
-scripts/config -k -e CONFIG_GENERIC_CPU2
+scripts/config -k -e CONFIG_GENERIC_CPU3
 scripts/config -e CACHY
 scripts/config -e SCHED_BORE
 
